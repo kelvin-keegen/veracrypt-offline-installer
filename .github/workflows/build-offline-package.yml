@@ -198,11 +198,11 @@ jobs:
             echo "Package: $zipfile"
             echo "Size: $(du -h $zipfile | cut -f1)"
             echo "Files inside:"
-            unzip -l "$zipfile" | head -20
+            unzip -l "$zipfile" | head -20 || true
             echo ""
           done > package-summary.txt
           
-          cat package-summary.txt
+          cat package-summary.txt || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
