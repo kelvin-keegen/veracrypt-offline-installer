@@ -193,7 +193,7 @@ jobs:
           cat package-summary.txt || true
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: veracrypt-offline-installer
           path: artifacts/*.zip
