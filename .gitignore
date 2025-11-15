@@ -1,0 +1,13 @@
+debs/
+veracrypt/
+*.deb
+*.tar.bz2
+.wget-hsts
+
+# Build artifacts
+build/
+artifacts/
+*.zip
+
+# Downloaded files
+*.bz2

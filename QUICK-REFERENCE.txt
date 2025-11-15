@@ -1,0 +1,101 @@
+╔══════════════════════════════════════════════════════════════════╗
+║          VERACRYPT OFFLINE INSTALLATION - QUICK REFERENCE         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+┌─ STEP 1: DOWNLOAD (Machine WITH Internet) ────────────────────────┐
+│                                                                    │
+│  $ sudo ./download-dependencies.sh                                │
+│                                                                    │
+│  This downloads:                                                  │
+│  • VeraCrypt installer (~20 MB)                                   │
+│  • All dependency packages (~10-30 MB)                            │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ STEP 2: TRANSFER ─────────────────────────────────────────────────┐
+│                                                                    │
+│  Copy the entire 'veracrypt' folder to:                           │
+│  • USB drive                                                      │
+│  • Network share                                                  │
+│  • CD/DVD                                                         │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ STEP 3: INSTALL (Machine WITHOUT Internet) ──────────────────────┐
+│                                                                    │
+│  $ sudo ./install-veracrypt-offline.sh                            │
+│                                                                    │
+│  Installation takes 2-5 minutes.                                  │
+│  No internet required!                                            │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ STEP 4: RUN ──────────────────────────────────────────────────────┐
+│                                                                    │
+│  $ veracrypt                                                      │
+│                                                                    │
+│  Or find "VeraCrypt" in your application menu.                    │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+
+HELPFUL COMMANDS:
+
+  ./menu.sh                    Interactive menu system
+  ./verify-package.sh          Check all files present
+  veracrypt --version          Show installed version
+  veracrypt --help             Show all commands
+
+═══════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING:
+
+  Permission denied?           Add sudo before command
+  Script won't run?            chmod +x *.sh
+  Dependencies missing?        Match Ubuntu versions
+  Can't find veracrypt?        Check /usr/bin/veracrypt
+
+═══════════════════════════════════════════════════════════════════
+
+FILES INCLUDED:
+
+  download-dependencies.sh     Downloads all packages
+  install-veracrypt-offline.sh Installs without internet
+  menu.sh                      Interactive menu
+  verify-package.sh            Verify package integrity
+  README.md                    Full documentation
+  USAGE.md                     Quick start guide
+  CHECKLIST.md                 Installation checklist
+
+  debs/                        Dependencies (after download)
+  veracrypt/                   VeraCrypt installer (after download)
+
+═══════════════════════════════════════════════════════════════════
+
+REQUIREMENTS:
+
+  • Ubuntu 18.04, 20.04, 22.04, or newer
+  • 100 MB free disk space
+  • sudo/root access
+  • x64 architecture
+
+═══════════════════════════════════════════════════════════════════
+
+TESTING:
+
+After installation, verify with:
+
+  $ which veracrypt           # Should show: /usr/bin/veracrypt
+  $ veracrypt --version       # Should show version number
+  $ lsmod | grep dm_crypt     # Should show loaded module
+
+═══════════════════════════════════════════════════════════════════
+
+SUPPORT:
+
+  • Check README.md for detailed help
+  • Check CHECKLIST.md for common issues
+  • Visit: https://www.veracrypt.fr
+
+═══════════════════════════════════════════════════════════════════

@@ -1,0 +1,279 @@
+name: Build VeraCrypt Offline Package
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      ubuntu_version:
+        description: 'Ubuntu version to build for'
+        required: false
+        default: '22.04'
+        type: choice
+        options:
+          - '20.04'
+          - '22.04'
+          - '24.04'
+      veracrypt_version:
+        description: 'VeraCrypt version (leave empty for latest)'
+        required: false
+        default: '1.26.7'
+
+jobs:
+  build-offline-package:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        ubuntu_version: ['20.04', '22.04']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget curl zip
+
+      - name: Create package directories
+        run: |
+          mkdir -p build/veracrypt-offline-installer/debs
+          mkdir -p build/veracrypt-offline-installer/veracrypt
+          mkdir -p artifacts
+
+      - name: Download VeraCrypt installer
+        run: |
+          VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.7' }}"
+          UBUNTU_VER="${{ matrix.ubuntu_version }}"
+          
+          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for Ubuntu ${UBUNTU_VER}"
+          
+          # Try direct download from Launchpad
+          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-Ubuntu-${UBUNTU_VER}-amd64.deb"
+          
+          wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-Ubuntu-${UBUNTU_VER}-amd64.deb" \
+            "$VERACRYPT_URL" || {
+            echo "Direct download failed, trying alternative..."
+            
+            # Alternative: Try setup.tar.bz2
+            ALT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
+            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
+              "$ALT_URL" || echo "Warning: Could not download VeraCrypt installer"
+          }
+
+      - name: Download dependencies
+        run: |
+          cd build/veracrypt-offline-installer/debs
+          
+          # Update package lists
+          sudo apt-get update
+          
+          # Define dependencies based on Ubuntu version
+          if [[ "${{ matrix.ubuntu_version }}" == "22.04" ]] || [[ "${{ matrix.ubuntu_version }}" == "24.04" ]]; then
+            DEPENDENCIES=(
+              "libfuse2"
+              "dmsetup"
+              "sudo"
+              "libwxgtk3.0-gtk3-0v5"
+              "libwxbase3.0-0v5"
+            )
+          else
+            DEPENDENCIES=(
+              "libfuse2"
+              "dmsetup"
+              "sudo"
+              "libwxgtk3.0-gtk3-0v5"
+              "libwxbase3.0-0v5"
+            )
+          fi
+          
+          # Download each package and its dependencies
+          for package in "${DEPENDENCIES[@]}"; do
+            echo "Downloading $package and dependencies..."
+            
+            # Download the package
+            apt-get download "$package" 2>/dev/null || {
+              echo "Warning: Could not download $package"
+              continue
+            }
+            
+            # Download all recursive dependencies
+            apt-cache depends --recurse --no-recommends --no-suggests \
+              --no-conflicts --no-breaks --no-replaces --no-enhances \
+              "$package" | grep "^\w" | sort -u | xargs apt-get download 2>/dev/null || true
+          done
+          
+          # Remove duplicates (keep latest version only)
+          for file in *.deb; do
+            [ -f "$file" ] || continue
+            basename="${file%%_*}"
+            count=$(ls -1 "${basename}"_*.deb 2>/dev/null | wc -l)
+            if [ "$count" -gt 1 ]; then
+              ls -1t "${basename}"_*.deb | tail -n +2 | xargs rm -f 2>/dev/null || true
+            fi
+          done
+          
+          echo "Downloaded $(ls -1 *.deb 2>/dev/null | wc -l) dependency packages"
+
+      - name: Copy installation scripts
+        run: |
+          cp install-veracrypt-offline.sh build/veracrypt-offline-installer/
+          cp menu.sh build/veracrypt-offline-installer/
+          cp verify-package.sh build/veracrypt-offline-installer/
+          cp README.md build/veracrypt-offline-installer/
+          cp USAGE.md build/veracrypt-offline-installer/
+          cp CHECKLIST.md build/veracrypt-offline-installer/
+          cp QUICK-REFERENCE.txt build/veracrypt-offline-installer/
+          
+          # Make scripts executable
+          chmod +x build/veracrypt-offline-installer/*.sh
+
+      - name: Create installation info file
+        run: |
+          cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
+          ╚══════════════════════════════════════════════════════════════════╝
+          
+          Build Information:
+          ------------------
+          Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Ubuntu Version: ${{ matrix.ubuntu_version }}
+          VeraCrypt Version: ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
+          Git Commit: ${{ github.sha }}
+          Git Branch: ${{ github.ref_name }}
+          
+          Package Contents:
+          -----------------
+          ✓ VeraCrypt installer
+          ✓ All required dependencies (.deb packages)
+          ✓ Installation scripts
+          ✓ Documentation
+          
+          Installation Instructions:
+          --------------------------
+          1. Extract this ZIP file on your Ubuntu ${{ matrix.ubuntu_version }} machine
+          2. Open a terminal in the extracted folder
+          3. Run: sudo ./install-veracrypt-offline.sh
+          4. Launch VeraCrypt: veracrypt
+          
+          For detailed instructions, see README.md
+          For quick reference, see QUICK-REFERENCE.txt
+          For interactive menu, run: ./menu.sh
+          
+          ╚══════════════════════════════════════════════════════════════════╝
+          EOF
+
+      - name: Generate checksums
+        run: |
+          cd build/veracrypt-offline-installer
+          
+          # Generate SHA256 checksums for all files
+          find . -type f \( -name "*.deb" -o -name "*.tar.bz2" -o -name "*.sh" \) \
+            -exec sha256sum {} \; > SHA256SUMS.txt
+          
+          echo "Checksums generated"
+
+      - name: Create ZIP package
+        run: |
+          cd build
+          PACKAGE_NAME="veracrypt-offline-ubuntu-${{ matrix.ubuntu_version }}-$(date +%Y%m%d).zip"
+          
+          zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
+          
+          # Move to artifacts directory
+          mv "$PACKAGE_NAME" ../artifacts/
+          
+          echo "Created package: $PACKAGE_NAME"
+          echo "Package size: $(du -h ../artifacts/$PACKAGE_NAME | cut -f1)"
+
+      - name: Generate package summary
+        run: |
+          cd artifacts
+          
+          for zipfile in *.zip; do
+            echo "Package: $zipfile"
+            echo "Size: $(du -h $zipfile | cut -f1)"
+            echo "Files inside:"
+            unzip -l "$zipfile" | head -20
+            echo ""
+          done > package-summary.txt
+          
+          cat package-summary.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: veracrypt-offline-ubuntu-${{ matrix.ubuntu_version }}
+          path: artifacts/*.zip
+          retention-days: 90
+
+      - name: Create release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*.zip
+          body: |
+            # VeraCrypt Offline Installation Package
+            
+            Built for Ubuntu ${{ matrix.ubuntu_version }}
+            
+            ## Installation
+            1. Download the ZIP file for your Ubuntu version
+            2. Extract on your offline Ubuntu machine
+            3. Run: `sudo ./install-veracrypt-offline.sh`
+            
+            ## Contents
+            - VeraCrypt ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
+            - All required dependencies
+            - Installation scripts and documentation
+            
+            See README.md in the package for detailed instructions.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-multi-version-package:
+    needs: build-offline-package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: all-packages
+
+      - name: Create multi-version README
+        run: |
+          cat > all-packages/README.txt << 'EOF'
+          VeraCrypt Offline Installation Packages
+          ========================================
+          
+          This archive contains offline installation packages for multiple Ubuntu versions.
+          
+          Choose the package that matches your Ubuntu version:
+          
+          - veracrypt-offline-ubuntu-20.04-*.zip  →  For Ubuntu 20.04 LTS
+          - veracrypt-offline-ubuntu-22.04-*.zip  →  For Ubuntu 22.04 LTS
+          
+          Installation:
+          1. Extract the appropriate ZIP file
+          2. Open terminal in the extracted folder
+          3. Run: sudo ./install-veracrypt-offline.sh
+          
+          For detailed instructions, see README.md inside each package.
+          EOF
+
+      - name: Create combined package
+        run: |
+          cd all-packages
+          zip -r veracrypt-offline-all-versions-$(date +%Y%m%d).zip .
+
+      - name: Upload combined package
+        uses: actions/upload-artifact@v3
+        with:
+          name: veracrypt-offline-all-versions
+          path: all-packages/veracrypt-offline-all-versions-*.zip
+          retention-days: 90
