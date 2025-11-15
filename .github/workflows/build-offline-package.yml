@@ -107,10 +107,7 @@ jobs:
           cp install-veracrypt-offline.sh build/veracrypt-offline-installer/
           cp menu.sh build/veracrypt-offline-installer/
           cp verify-package.sh build/veracrypt-offline-installer/
-          cp README.md build/veracrypt-offline-installer/
           cp USAGE.md build/veracrypt-offline-installer/
-          cp CHECKLIST.md build/veracrypt-offline-installer/
-          cp QUICK-REFERENCE.txt build/veracrypt-offline-installer/
           
           # Make scripts executable
           chmod +x build/veracrypt-offline-installer/*.sh
@@ -147,8 +144,7 @@ jobs:
           
           Note: Built for Ubuntu $UBUNTU_VER, should work on similar versions.
           
-          For detailed instructions, see README.md
-          For quick reference, see QUICK-REFERENCE.txt
+          For installation instructions, see USAGE.md
           For interactive menu, run: ./menu.sh
           
           ╚══════════════════════════════════════════════════════════════════╝
@@ -193,7 +189,7 @@ jobs:
           cat package-summary.txt || true
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: veracrypt-offline-installer
           path: artifacts/*.zip
