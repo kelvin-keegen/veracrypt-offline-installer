@@ -7,17 +7,8 @@ on:
       - master
   workflow_dispatch:
     inputs:
-      ubuntu_version:
-        description: 'Ubuntu version to build for'
-        required: false
-        default: '22.04'
-        type: choice
-        options:
-          - '20.04'
-          - '22.04'
-          - '24.04'
       veracrypt_version:
-        description: 'VeraCrypt version (leave empty for latest)'
+        description: 'VeraCrypt version'
         required: false
         default: '1.26.7'
 
@@ -25,18 +16,21 @@ jobs:
   build-offline-package:
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        ubuntu_version: ['20.04', '22.04']
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Detect Ubuntu version
+        id: detect-version
+        run: |
+          UBUNTU_VER=$(lsb_release -rs)
+          echo "ubuntu_version=$UBUNTU_VER" >> $GITHUB_OUTPUT
+          echo "Detected Ubuntu version: $UBUNTU_VER"
+
       - name: Set up build environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget curl zip
+          sudo apt-get install -y wget curl zip lsb-release
 
       - name: Create package directories
         run: |
@@ -47,7 +41,7 @@ jobs:
       - name: Download VeraCrypt installer
         run: |
           VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.7' }}"
-          UBUNTU_VER="${{ matrix.ubuntu_version }}"
+          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
           
           echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for Ubuntu ${UBUNTU_VER}"
           
@@ -71,24 +65,14 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Define dependencies based on Ubuntu version
-          if [[ "${{ matrix.ubuntu_version }}" == "22.04" ]] || [[ "${{ matrix.ubuntu_version }}" == "24.04" ]]; then
-            DEPENDENCIES=(
-              "libfuse2"
-              "dmsetup"
-              "sudo"
-              "libwxgtk3.0-gtk3-0v5"
-              "libwxbase3.0-0v5"
-            )
-          else
-            DEPENDENCIES=(
-              "libfuse2"
-              "dmsetup"
-              "sudo"
-              "libwxgtk3.0-gtk3-0v5"
-              "libwxbase3.0-0v5"
-            )
-          fi
+          # Define dependencies (same for all Ubuntu versions)
+          DEPENDENCIES=(
+            "libfuse2"
+            "dmsetup"
+            "sudo"
+            "libwxgtk3.0-gtk3-0v5"
+            "libwxbase3.0-0v5"
+          )
           
           # Download each package and its dependencies
           for package in "${DEPENDENCIES[@]}"; do
@@ -133,6 +117,7 @@ jobs:
 
       - name: Create installation info file
         run: |
+          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
           cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
           ╔══════════════════════════════════════════════════════════════════╗
           ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
@@ -141,7 +126,7 @@ jobs:
           Build Information:
           ------------------
           Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          Ubuntu Version: ${{ matrix.ubuntu_version }}
+          Built for Ubuntu: $UBUNTU_VER
           VeraCrypt Version: ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
           Git Commit: ${{ github.sha }}
           Git Branch: ${{ github.ref_name }}
@@ -155,10 +140,12 @@ jobs:
           
           Installation Instructions:
           --------------------------
-          1. Extract this ZIP file on your Ubuntu ${{ matrix.ubuntu_version }} machine
+          1. Extract this ZIP file on your Ubuntu machine
           2. Open a terminal in the extracted folder
           3. Run: sudo ./install-veracrypt-offline.sh
           4. Launch VeraCrypt: veracrypt
+          
+          Note: Built for Ubuntu $UBUNTU_VER, should work on similar versions.
           
           For detailed instructions, see README.md
           For quick reference, see QUICK-REFERENCE.txt
@@ -180,7 +167,8 @@ jobs:
       - name: Create ZIP package
         run: |
           cd build
-          PACKAGE_NAME="veracrypt-offline-ubuntu-${{ matrix.ubuntu_version }}-$(date +%Y%m%d).zip"
+          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
+          PACKAGE_NAME="veracrypt-offline-ubuntu-${UBUNTU_VER}-$(date +%Y%m%d).zip"
           
           zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
           
@@ -207,7 +195,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: veracrypt-offline-ubuntu-${{ matrix.ubuntu_version }}
+          name: veracrypt-offline-installer
           path: artifacts/*.zip
           retention-days: 90
 
@@ -222,10 +210,10 @@ jobs:
           body: |
             # VeraCrypt Offline Installation Package
             
-            Built for Ubuntu ${{ matrix.ubuntu_version }}
+            Built for Ubuntu ${{ steps.detect-version.outputs.ubuntu_version }}
             
             ## Installation
-            1. Download the ZIP file for your Ubuntu version
+            1. Download the ZIP file
             2. Extract on your offline Ubuntu machine
             3. Run: `sudo ./install-veracrypt-offline.sh`
             
@@ -237,46 +225,3 @@ jobs:
             See README.md in the package for detailed instructions.
           draft: false
           prerelease: false
-
-  create-multi-version-package:
-    needs: build-offline-package
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: all-packages
-
-      - name: Create multi-version README
-        run: |
-          cat > all-packages/README.txt << 'EOF'
-          VeraCrypt Offline Installation Packages
-          ========================================
-          
-          This archive contains offline installation packages for multiple Ubuntu versions.
-          
-          Choose the package that matches your Ubuntu version:
-          
-          - veracrypt-offline-ubuntu-20.04-*.zip  →  For Ubuntu 20.04 LTS
-          - veracrypt-offline-ubuntu-22.04-*.zip  →  For Ubuntu 22.04 LTS
-          
-          Installation:
-          1. Extract the appropriate ZIP file
-          2. Open terminal in the extracted folder
-          3. Run: sudo ./install-veracrypt-offline.sh
-          
-          For detailed instructions, see README.md inside each package.
-          EOF
-
-      - name: Create combined package
-        run: |
-          cd all-packages
-          zip -r veracrypt-offline-all-versions-$(date +%Y%m%d).zip .
-
-      - name: Upload combined package
-        uses: actions/upload-artifact@v3
-        with:
-          name: veracrypt-offline-all-versions
-          path: all-packages/veracrypt-offline-all-versions-*.zip
-          retention-days: 90
