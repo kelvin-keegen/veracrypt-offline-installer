@@ -129,70 +129,112 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
         echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
         chmod +x "$GUI_INSTALLER"
         
-        # Check if dbus-launch is available (needed by installer)
-        if ! command -v dbus-launch &> /dev/null; then
-            echo -e "${YELLOW}Note: dbus-launch not available, using alternative installation method${NC}"
+        # Manual extraction and installation (bypasses dbus-launch requirement)
+        echo -e "${YELLOW}Extracting VeraCrypt installer...${NC}"
+        
+        EXTRACT_DIR=$(mktemp -d)
+        INSTALL_SUCCESS=false
+        
+        # Method 1: Try --tar xvf (makeself option)
+        if "$GUI_INSTALLER" --tar xvf 2>&1 | grep -q "veracrypt"; then
+            echo -e "${GREEN}Extraction successful${NC}"
             
-            # Manual extraction and installation (doesn't require dbus-launch)
-            echo -e "${YELLOW}Extracting VeraCrypt files manually...${NC}"
-            
-            # The GUI installer is a self-extracting archive
-            # We'll run it with --tar to just extract, then install manually
-            EXTRACT_DIR=$(mktemp -d)
-            
-            # Try to extract with --tar option first
-            if "$GUI_INSTALLER" --tar -xf - -C "$EXTRACT_DIR" 2>/dev/null; then
-                echo -e "${GREEN}Files extracted${NC}"
-            else
-                # Fallback: the installer itself contains the files after the script header
-                # Find where the tar.gz starts (after __ARCHIVE__ marker)
-                ARCHIVE_LINE=$(grep -an "^__ARCHIVE__" "$GUI_INSTALLER" | cut -d: -f1)
-                if [ -n "$ARCHIVE_LINE" ]; then
-                    tail -n +$((ARCHIVE_LINE + 1)) "$GUI_INSTALLER" | tar -xzf - -C "$EXTRACT_DIR" 2>/dev/null || \
-                    tail -n +$((ARCHIVE_LINE + 1)) "$GUI_INSTALLER" | tar -xjf - -C "$EXTRACT_DIR" 2>/dev/null
-                fi
+            # Files are extracted to current directory by makeself
+            # Find and copy the extracted files
+            if [ -f "./veracrypt" ]; then
+                install -D -m 755 "./veracrypt" /usr/bin/veracrypt
+                INSTALL_SUCCESS=true
             fi
             
-            # Install files manually
-            if [ -f "$EXTRACT_DIR/usr/bin/veracrypt" ]; then
-                echo -e "${GREEN}Installing VeraCrypt binary and files...${NC}"
-                cp -r "$EXTRACT_DIR/usr/"* /usr/ 2>/dev/null || true
-                chmod +x /usr/bin/veracrypt 2>/dev/null || true
-                
-                # Create desktop entry if it doesn't exist
-                if [ ! -f /usr/share/applications/veracrypt.desktop ] && [ -f "$EXTRACT_DIR/usr/share/applications/veracrypt.desktop" ]; then
-                    cp "$EXTRACT_DIR/usr/share/applications/veracrypt.desktop" /usr/share/applications/
-                fi
-                
-                echo -e "${GREEN}Manual installation completed${NC}"
-            else
-                echo -e "${RED}Failed to extract VeraCrypt files${NC}"
-                echo -e "${YELLOW}Trying standard installer anyway...${NC}"
-                "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log || true
+            if [ -f "./veracrypt.desktop" ]; then
+                install -D -m 644 "./veracrypt.desktop" /usr/share/applications/veracrypt.desktop
             fi
             
-            rm -rf "$EXTRACT_DIR"
-        else
-            # dbus-launch available, use normal installation
-            echo -e "${YELLOW}Running installer (this may take a moment)...${NC}"
+            # Clean up extracted files
+            rm -f ./veracrypt ./veracrypt.desktop 2>/dev/null
+        fi
+        
+        # Method 2: If method 1 failed, try using --target with extraction
+        if [ "$INSTALL_SUCCESS" = false ]; then
+            echo -e "${YELLOW}Trying alternative extraction method...${NC}"
+            
+            if "$GUI_INSTALLER" --target "$EXTRACT_DIR" --noexec 2>&1 | tee /tmp/veracrypt-extract.log; then
+                echo -e "${GREEN}Files extracted to temporary directory${NC}"
+                
+                # Look for veracrypt binary in extracted files
+                if [ -f "$EXTRACT_DIR/veracrypt" ]; then
+                    install -D -m 755 "$EXTRACT_DIR/veracrypt" /usr/bin/veracrypt
+                    INSTALL_SUCCESS=true
+                    echo -e "${GREEN}Installed VeraCrypt binary${NC}"
+                fi
+                
+                # Look for desktop file
+                if [ -f "$EXTRACT_DIR/veracrypt.desktop" ]; then
+                    install -D -m 644 "$EXTRACT_DIR/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
+                    echo -e "${GREEN}Installed desktop entry${NC}"
+                fi
+                
+                # Check for other common locations in the extracted archive
+                for dir in "$EXTRACT_DIR/usr/bin" "$EXTRACT_DIR/usr/local/bin"; do
+                    if [ -f "$dir/veracrypt" ]; then
+                        install -D -m 755 "$dir/veracrypt" /usr/bin/veracrypt
+                        INSTALL_SUCCESS=true
+                        echo -e "${GREEN}Found and installed VeraCrypt binary from $dir${NC}"
+                    fi
+                done
+                
+                for dir in "$EXTRACT_DIR/usr/share/applications" "$EXTRACT_DIR/usr/local/share/applications"; do
+                    if [ -f "$dir/veracrypt.desktop" ]; then
+                        install -D -m 644 "$dir/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
+                        echo -e "${GREEN}Found and installed desktop entry from $dir${NC}"
+                    fi
+                done
+            fi
+        fi
+        
+        # Method 3: If extraction methods failed, try running installer with workaround
+        if [ "$INSTALL_SUCCESS" = false ]; then
+            echo -e "${YELLOW}Extraction failed, attempting direct installation...${NC}"
+            
+            # Create a minimal dbus-launch wrapper if it doesn't exist
+            if ! command -v dbus-launch &> /dev/null; then
+                echo -e "${YELLOW}Creating temporary dbus-launch workaround...${NC}"
+                cat > /tmp/dbus-launch-wrapper.sh << 'EOF'
+#!/bin/bash
+# Minimal wrapper to bypass dbus-launch requirement
+exec "$@"
+EOF
+                chmod +x /tmp/dbus-launch-wrapper.sh
+                export PATH="/tmp:$PATH"
+                ln -sf /tmp/dbus-launch-wrapper.sh /tmp/dbus-launch
+            fi
             
             # Set environment for non-interactive installation
             export LESS="-X"
             export PAGER="cat"
             
-            # Run installer with proper error handling
+            # Try to run the installer
             if "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log; then
-                echo -e "${GREEN}VeraCrypt installer completed successfully${NC}"
+                INSTALL_SUCCESS=true
+                echo -e "${GREEN}Installer completed${NC}"
             else
-                INSTALL_EXIT=$?
-                # Installer may exit non-zero even on success, check if files exist
+                # Check if installation succeeded despite error
                 if [ -f /usr/bin/veracrypt ] || [ -f /usr/local/bin/veracrypt ]; then
-                    echo -e "${GREEN}VeraCrypt installed despite exit code $INSTALL_EXIT${NC}"
-                else
-                    echo -e "${YELLOW}Installer exited with code $INSTALL_EXIT${NC}"
-                    echo -e "${YELLOW}Installation may have completed - will verify...${NC}"
+                    INSTALL_SUCCESS=true
+                    echo -e "${GREEN}VeraCrypt installed successfully${NC}"
                 fi
             fi
+            
+            # Clean up wrapper
+            rm -f /tmp/dbus-launch /tmp/dbus-launch-wrapper.sh 2>/dev/null
+        fi
+        
+        # Clean up extraction directory
+        rm -rf "$EXTRACT_DIR"
+        
+        if [ "$INSTALL_SUCCESS" = false ]; then
+            echo -e "${RED}All installation methods failed${NC}"
+            echo -e "${YELLOW}Check /tmp/veracrypt-install.log and /tmp/veracrypt-extract.log for details${NC}"
         fi
     elif [ -n "$CONSOLE_INSTALLER" ]; then
         echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
