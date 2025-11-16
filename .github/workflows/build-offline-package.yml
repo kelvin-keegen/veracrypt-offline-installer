@@ -24,7 +24,20 @@ on:
 
 jobs:
   build-offline-package:
-    runs-on: ubuntu-24.04  # Match the TARGET_UBUNTU_VERSION
+    runs-on: ubuntu-24.04  # Use Ubuntu runner for both builds
+    strategy:
+      matrix:
+        include:
+          - os_name: Ubuntu
+            os_version: "24.04"
+            veracrypt_package: "veracrypt-1.26.24-Ubuntu-24.04-amd64.deb"
+            build_name: "ubuntu-24.04"
+          - os_name: Debian
+            os_version: "12"
+            veracrypt_package: "veracrypt-1.26.24-Debian-12-amd64.deb"
+            build_name: "debian-12"
+    
+    name: Build for ${{ matrix.os_name }} ${{ matrix.os_version }}
     
     steps:
       - name: Checkout repository
@@ -39,35 +52,10 @@ jobs:
             VERACRYPT_VER="${{ env.VERACRYPT_VERSION }}"
           fi
           
-          TARGET_VER="${{ github.event.inputs.target_ubuntu_version }}"
-          if [ -z "$TARGET_VER" ]; then
-            TARGET_VER="${{ env.TARGET_UBUNTU_VERSION }}"
-          fi
-          
           echo "veracrypt_version=$VERACRYPT_VER" >> $GITHUB_OUTPUT
-          echo "target_version=$TARGET_VER" >> $GITHUB_OUTPUT
-          echo "Building for Ubuntu $TARGET_VER with VeraCrypt $VERACRYPT_VER"
-
-      - name: Detect Debian/Ubuntu version
-        id: detect-version
-        run: |
-          # Check for Ubuntu first (it also has /etc/debian_version)
-          if [ -f /etc/lsb-release ]; then
-            OS_NAME=$(lsb_release -is)
-            OS_VER=$(lsb_release -rs)
-          elif [ -f /etc/debian_version ]; then
-            DEBIAN_VER=$(cat /etc/debian_version | cut -d. -f1)
-            OS_NAME="Debian"
-            OS_VER="$DEBIAN_VER"
-          else
-            OS_NAME="Unknown"
-            OS_VER="Unknown"
-          fi
-          # Sanitize version string (remove slashes and special chars)
-          OS_VER_CLEAN=$(echo "$OS_VER" | sed 's/[\/]/-/g' | sed 's/[^a-zA-Z0-9.-]//g')
-          echo "os_name=$OS_NAME" >> $GITHUB_OUTPUT
-          echo "os_version=$OS_VER_CLEAN" >> $GITHUB_OUTPUT
-          echo "Detected: $OS_NAME $OS_VER (sanitized to: $OS_VER_CLEAN)"
+          echo "os_name=${{ matrix.os_name }}" >> $GITHUB_OUTPUT
+          echo "os_version=${{ matrix.os_version }}" >> $GITHUB_OUTPUT
+          echo "Building for ${{ matrix.os_name }} ${{ matrix.os_version }} with VeraCrypt $VERACRYPT_VER"
 
       - name: Set up build environment
         run: |
@@ -83,30 +71,21 @@ jobs:
       - name: Download VeraCrypt installer
         run: |
           VERACRYPT_VERSION="${{ steps.config.outputs.veracrypt_version }}"
-          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
+          OS_NAME="${{ matrix.os_name }}"
+          VERACRYPT_PACKAGE="${{ matrix.veracrypt_package }}"
           
           echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for ${OS_NAME}"
           
-          # Download the appropriate DEB package for Ubuntu (easier to install offline)
-          if [ "$OS_NAME" = "ubuntu" ] || [ "$OS_NAME" = "Ubuntu" ]; then
-            # Ubuntu DEB package - much easier to install offline
-            VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-Ubuntu-24.04-amd64.deb"
-            
-            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-Ubuntu-24.04-amd64.deb" \
-              "$VERACRYPT_URL" || {
-              echo "Error: Could not download VeraCrypt .deb installer"
-              exit 1
-            }
-          else
-            # Fallback to generic Linux setup for other distros
-            VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
-            
-            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
-              "$VERACRYPT_URL" || {
-              echo "Error: Could not download VeraCrypt installer"
-              exit 1
-            }
-          fi
+          # Download the specific .deb package for the target OS
+          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/${VERACRYPT_PACKAGE}"
+          
+          wget -O "build/veracrypt-offline-installer/veracrypt/${VERACRYPT_PACKAGE}" \
+            "$VERACRYPT_URL" || {
+            echo "Error: Could not download VeraCrypt .deb installer"
+            exit 1
+          }
+          
+          echo "✓ Downloaded: ${VERACRYPT_PACKAGE}"
 
       - name: Download dependencies
         run: |
@@ -201,8 +180,8 @@ jobs:
 
       - name: Create installation info file
         run: |
-          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
-          OS_VER="${{ steps.detect-version.outputs.os_version }}"
+          OS_NAME="${{ matrix.os_name }}"
+          OS_VER="${{ matrix.os_version }}"
           cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
           ╔══════════════════════════════════════════════════════════════════╗
           ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
@@ -211,7 +190,7 @@ jobs:
           Build Information:
           ------------------
           Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          Built for: $OS_NAME $OS_VER (compatible with Debian/Ubuntu)
+          Built for: $OS_NAME $OS_VER
           VeraCrypt Version: ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
           Git Commit: ${{ github.sha }}
           Git Branch: ${{ github.ref_name }}
@@ -252,13 +231,11 @@ jobs:
         run: |
           cd build
           
-          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
-          OS_VER="${{ steps.detect-version.outputs.os_version }}"
-          TARGET_VER="${{ steps.config.outputs.target_version }}"
+          BUILD_NAME="${{ matrix.build_name }}"
           VERACRYPT_VER="${{ steps.config.outputs.veracrypt_version }}"
           
           # Package name indicates it's for FRESH ISO install (no internet/apt update needed)
-          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-ubuntu-${TARGET_VER}-FRESH-ISO-$(date +%Y%m%d).zip"
+          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-${BUILD_NAME}-FRESH-ISO-$(date +%Y%m%d).zip"
           
           zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
           
@@ -293,7 +270,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: veracrypt-offline-installer
+          name: veracrypt-offline-installer-${{ matrix.build_name }}
           path: artifacts/*.zip
           retention-days: 7
 
