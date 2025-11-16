@@ -336,3 +336,6 @@ echo -e "  ${GREEN}veracrypt${NC}"
 echo ""
 echo -e "${YELLOW}Or find it in your applications menu.${NC}"
 echo ""
+
+# Ensure script exits successfully
+exit 0
