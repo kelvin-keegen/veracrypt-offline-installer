@@ -20,12 +20,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Detect Ubuntu version
+      - name: Detect Debian/Ubuntu version
         id: detect-version
         run: |
-          UBUNTU_VER=$(lsb_release -rs)
-          echo "ubuntu_version=$UBUNTU_VER" >> $GITHUB_OUTPUT
-          echo "Detected Ubuntu version: $UBUNTU_VER"
+          if [ -f /etc/debian_version ]; then
+            DEBIAN_VER=$(cat /etc/debian_version | cut -d. -f1)
+            OS_NAME="Debian"
+            OS_VER="$DEBIAN_VER"
+          else
+            OS_NAME=$(lsb_release -is)
+            OS_VER=$(lsb_release -rs)
+          fi
+          echo "os_name=$OS_NAME" >> $GITHUB_OUTPUT
+          echo "os_version=$OS_VER" >> $GITHUB_OUTPUT
+          echo "Detected: $OS_NAME $OS_VER"
 
       - name: Set up build environment
         run: |
@@ -41,21 +49,16 @@ jobs:
       - name: Download VeraCrypt installer
         run: |
           VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.7' }}"
-          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
           
-          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for Ubuntu ${UBUNTU_VER}"
+          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} (Generic Linux)"
           
-          # Try direct download from Launchpad
-          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-Ubuntu-${UBUNTU_VER}-amd64.deb"
+          # Download generic Linux setup (works on both Debian and Ubuntu)
+          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
           
-          wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-Ubuntu-${UBUNTU_VER}-amd64.deb" \
+          wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
             "$VERACRYPT_URL" || {
-            echo "Direct download failed, trying alternative..."
-            
-            # Alternative: Try setup.tar.bz2
-            ALT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
-            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
-              "$ALT_URL" || echo "Warning: Could not download VeraCrypt installer"
+            echo "Error: Could not download VeraCrypt installer"
+            exit 1
           }
 
       - name: Download dependencies
@@ -65,30 +68,18 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Detect Ubuntu version for proper dependencies
-          UBUNTU_VER=$(lsb_release -rs)
-          
-          # Define dependencies based on Ubuntu version
-          if [[ "$UBUNTU_VER" == "24.04" ]]; then
-            DEPENDENCIES=(
-              "libfuse2t64"
-              "pcscd"
-              "dmsetup"
-              "sudo"
-              "libwxgtk3.2-1t64"
-              "libwxbase3.2-1t64"
-            )
-          else
-            # For Ubuntu 20.04, 22.04
-            DEPENDENCIES=(
-              "libfuse2"
-              "pcscd"
-              "dmsetup"
-              "sudo"
-              "libwxgtk3.0-gtk3-0v5"
-              "libwxbase3.0-0v5"
-            )
-          fi
+          # Universal dependencies for Debian/Ubuntu
+          DEPENDENCIES=(
+            "libfuse2t64"
+            "libfuse2"
+            "pcscd"
+            "dmsetup"
+            "sudo"
+            "libwxgtk3.2-1t64"
+            "libwxbase3.2-1t64"
+            "libwxgtk3.0-gtk3-0v5"
+            "libwxbase3.0-0v5"
+          )
           
           # Download each package and its dependencies
           for package in "${DEPENDENCIES[@]}"; do
@@ -130,7 +121,8 @@ jobs:
 
       - name: Create installation info file
         run: |
-          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
+          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
+          OS_VER="${{ steps.detect-version.outputs.os_version }}"
           cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
           ╔══════════════════════════════════════════════════════════════════╗
           ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
@@ -139,26 +131,26 @@ jobs:
           Build Information:
           ------------------
           Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          Built for Ubuntu: $UBUNTU_VER
+          Built for: $OS_NAME $OS_VER (compatible with Debian/Ubuntu)
           VeraCrypt Version: ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
           Git Commit: ${{ github.sha }}
           Git Branch: ${{ github.ref_name }}
           
           Package Contents:
           -----------------
-          ✓ VeraCrypt installer
+          ✓ VeraCrypt generic installer (works on Debian/Ubuntu)
           ✓ All required dependencies (.deb packages)
           ✓ Installation scripts
           ✓ Documentation
           
           Installation Instructions:
           --------------------------
-          1. Extract this ZIP file on your Ubuntu machine
+          1. Extract this ZIP file on your Debian/Ubuntu machine
           2. Open a terminal in the extracted folder
           3. Run: sudo ./install-veracrypt-offline.sh
           4. Launch VeraCrypt: veracrypt
           
-          Note: Built for Ubuntu $UBUNTU_VER, should work on similar versions.
+          Compatible with: Debian 11+, Ubuntu 20.04+
           
           For installation instructions, see USAGE.md
           For interactive menu, run: ./menu.sh
@@ -179,8 +171,9 @@ jobs:
       - name: Create ZIP package
         run: |
           cd build
-          UBUNTU_VER="${{ steps.detect-version.outputs.ubuntu_version }}"
-          PACKAGE_NAME="veracrypt-offline-ubuntu-${UBUNTU_VER}-$(date +%Y%m%d).zip"
+          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
+          OS_VER="${{ steps.detect-version.outputs.os_version }}"
+          PACKAGE_NAME="veracrypt-offline-debian-${OS_VER}-$(date +%Y%m%d).zip"
           
           zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
           
@@ -222,18 +215,18 @@ jobs:
           body: |
             # VeraCrypt Offline Installation Package
             
-            Built for Ubuntu ${{ steps.detect-version.outputs.ubuntu_version }}
+            Built for Debian/Ubuntu (compatible with Debian 11+, Ubuntu 20.04+)
             
             ## Installation
             1. Download the ZIP file
-            2. Extract on your offline Ubuntu machine
+            2. Extract on your offline Debian/Ubuntu machine
             3. Run: `sudo ./install-veracrypt-offline.sh`
             
             ## Contents
-            - VeraCrypt ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
+            - VeraCrypt ${{ github.event.inputs.veracrypt_version || '1.26.7' }} (generic installer)
             - All required dependencies
             - Installation scripts and documentation
             
-            See README.md in the package for detailed instructions.
+            See USAGE.md in the package for detailed instructions.
           draft: false
           prerelease: false
