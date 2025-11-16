@@ -102,6 +102,14 @@ echo ""
 # Step 2: Install VeraCrypt
 echo -e "${YELLOW}Step 2: Installing VeraCrypt...${NC}"
 
+# Fix for Debian: Create systemd compatibility symlink if using elogind
+if [ -f /lib/x86_64-linux-gnu/libelogind.so.0 ] && [ ! -f /lib/x86_64-linux-gnu/libsystemd.so.0 ]; then
+    echo -e "${YELLOW}Creating elogind/systemd compatibility symlink...${NC}"
+    ln -sf libelogind.so.0 /lib/x86_64-linux-gnu/libsystemd.so.0
+    ldconfig
+    echo -e "${GREEN}Compatibility symlink created${NC}"
+fi
+
 if [[ "$VERACRYPT_INSTALLER" == *.deb ]]; then
     # Install .deb package
     echo -e "${GREEN}Installing VeraCrypt from .deb package...${NC}"
