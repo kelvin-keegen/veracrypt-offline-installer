@@ -65,14 +65,30 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Define dependencies (same for all Ubuntu versions)
-          DEPENDENCIES=(
-            "libfuse2"
-            "dmsetup"
-            "sudo"
-            "libwxgtk3.0-gtk3-0v5"
-            "libwxbase3.0-0v5"
-          )
+          # Detect Ubuntu version for proper dependencies
+          UBUNTU_VER=$(lsb_release -rs)
+          
+          # Define dependencies based on Ubuntu version
+          if [[ "$UBUNTU_VER" == "24.04" ]]; then
+            DEPENDENCIES=(
+              "libfuse2t64"
+              "pcscd"
+              "dmsetup"
+              "sudo"
+              "libwxgtk3.2-1t64"
+              "libwxbase3.2-1t64"
+            )
+          else
+            # For Ubuntu 20.04, 22.04
+            DEPENDENCIES=(
+              "libfuse2"
+              "pcscd"
+              "dmsetup"
+              "sudo"
+              "libwxgtk3.0-gtk3-0v5"
+              "libwxbase3.0-0v5"
+            )
+          fi
           
           # Download each package and its dependencies
           for package in "${DEPENDENCIES[@]}"; do
