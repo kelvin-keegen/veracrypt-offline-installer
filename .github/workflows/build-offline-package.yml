@@ -51,13 +51,17 @@ jobs:
       - name: Detect Debian/Ubuntu version
         id: detect-version
         run: |
-          if [ -f /etc/debian_version ]; then
+          # Check for Ubuntu first (it also has /etc/debian_version)
+          if [ -f /etc/lsb-release ]; then
+            OS_NAME=$(lsb_release -is)
+            OS_VER=$(lsb_release -rs)
+          elif [ -f /etc/debian_version ]; then
             DEBIAN_VER=$(cat /etc/debian_version | cut -d. -f1)
             OS_NAME="Debian"
             OS_VER="$DEBIAN_VER"
           else
-            OS_NAME=$(lsb_release -is)
-            OS_VER=$(lsb_release -rs)
+            OS_NAME="Unknown"
+            OS_VER="Unknown"
           fi
           # Sanitize version string (remove slashes and special chars)
           OS_VER_CLEAN=$(echo "$OS_VER" | sed 's/[\/]/-/g' | sed 's/[^a-zA-Z0-9.-]//g')
