@@ -58,12 +58,17 @@ echo ""
 echo -e "${YELLOW}Step 1: Installing dependencies...${NC}"
 
 if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
-    # Install all .deb files in dependency order
-    dpkg -i "$DEBS_DIR"/*.deb 2>/dev/null || true
+    # Count total packages for progress indication
+    TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
+    echo -e "${GREEN}Found $TOTAL_DEBS package(s) to install${NC}"
+    
+    # Install all .deb files at once (faster than individual installs)
+    echo -e "${YELLOW}Installing packages (this may take a moment)...${NC}"
+    dpkg -i "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
     
     # Fix any dependency issues
-    echo -e "${YELLOW}Fixing any dependency issues...${NC}"
-    dpkg --configure -a
+    echo -e "${YELLOW}Configuring packages...${NC}"
+    dpkg --configure -a 2>&1 | tail -n 5
     
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 else

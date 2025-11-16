@@ -70,33 +70,31 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Universal dependencies for Debian/Ubuntu
+          # Core dependencies only (minimal set for VeraCrypt GUI)
           DEPENDENCIES=(
             "libfuse2t64"
             "libfuse2"
             "pcscd"
             "dmsetup"
-            "sudo"
             "libwxgtk3.2-1t64"
-            "libwxbase3.2-1t64"
             "libwxgtk3.0-gtk3-0v5"
-            "libwxbase3.0-0v5"
           )
           
-          # Download each package and its dependencies
+          # Download each package and its direct dependencies only
           for package in "${DEPENDENCIES[@]}"; do
-            echo "Downloading $package and dependencies..."
+            echo "Downloading $package..."
             
-            # Download the package
+            # Download the package (skip if not available)
             apt-get download "$package" 2>/dev/null || {
-              echo "Warning: Could not download $package"
+              echo "Warning: Could not download $package (may not be needed on target system)"
               continue
             }
             
-            # Download all recursive dependencies
-            apt-cache depends --recurse --no-recommends --no-suggests \
+            # Download only direct dependencies (not recursive to reduce package count)
+            apt-cache depends --no-recommends --no-suggests \
               --no-conflicts --no-breaks --no-replaces --no-enhances \
-              "$package" | grep "^\w" | sort -u | xargs apt-get download 2>/dev/null || true
+              "$package" | grep "Depends:" | awk '{print $2}' | \
+              xargs -r apt-get download 2>/dev/null || true
           done
           
           # Remove duplicates (keep latest version only)
