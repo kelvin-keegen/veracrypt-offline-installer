@@ -131,6 +131,8 @@ jobs:
             "libx11-6"
             "libsm6"
             "libxkbcommon0"
+            # Extraction utilities (required for .tar.bz2)
+            "bzip2"
           )
           
           echo "Downloading ${#DEPENDENCIES[@]} core packages and their dependencies..."
