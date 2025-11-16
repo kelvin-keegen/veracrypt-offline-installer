@@ -10,7 +10,7 @@ on:
       veracrypt_version:
         description: 'VeraCrypt version'
         required: false
-        default: '1.26.7'
+        default: '1.26.24'
 
 jobs:
   build-offline-package:
@@ -50,7 +50,7 @@ jobs:
 
       - name: Download VeraCrypt installer
         run: |
-          VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.7' }}"
+          VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.24' }}"
           
           echo "Downloading VeraCrypt ${VERACRYPT_VERSION} (Generic Linux)"
           

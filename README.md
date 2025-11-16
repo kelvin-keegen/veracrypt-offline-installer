@@ -159,7 +159,7 @@ sudo /usr/bin/veracrypt-uninstall.sh
 ## Version Information
 
 - Script Version: 1.0
-- Tested with VeraCrypt: 1.26.7
+- Tested with VeraCrypt: 1.26.24 (latest stable as of May 2025)
 - Tested on Ubuntu: 20.04, 22.04
 
 ## License

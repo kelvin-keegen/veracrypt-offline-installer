@@ -41,19 +41,19 @@ echo ""
 echo -e "${YELLOW}Step 1: Downloading VeraCrypt...${NC}"
 
 # VeraCrypt download URL (latest stable version)
-VERACRYPT_VERSION="1.26.7"
-VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-Ubuntu-22.04-amd64.deb"
-VERACRYPT_FILE="${VERACRYPT_DIR}/veracrypt-${VERACRYPT_VERSION}-Ubuntu-22.04-amd64.deb"
+VERACRYPT_VERSION="1.26.24"
+VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
+VERACRYPT_FILE="${VERACRYPT_DIR}/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
 
-echo -e "${GREEN}Downloading VeraCrypt ${VERACRYPT_VERSION}...${NC}"
+echo -e "${GREEN}Downloading VeraCrypt ${VERACRYPT_VERSION} (Generic Linux installer)...${NC}"
 
 if ! wget -O "$VERACRYPT_FILE" "$VERACRYPT_URL" 2>/dev/null; then
     echo -e "${YELLOW}Direct download failed, trying alternative method...${NC}"
     
     # Alternative: Download from official website
     echo -e "${YELLOW}Please download VeraCrypt manually from:${NC}"
-    echo -e "${GREEN}https://www.veracrypt.fr/en/Downloads.html${NC}"
-    echo -e "${YELLOW}And place the .deb or .tar.bz2 file in: $VERACRYPT_DIR${NC}"
+    echo -e "${GREEN}https://veracrypt.io/en/Downloads.html${NC}"
+    echo -e "${YELLOW}And place the .tar.bz2 file in: $VERACRYPT_DIR${NC}"
     echo ""
     echo -e "${YELLOW}Press Enter when done, or Ctrl+C to exit...${NC}"
     read -r
