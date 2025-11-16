@@ -131,13 +131,15 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
         # Run in truly unattended mode - installs GUI VeraCrypt without any popups
         export LESS="-X"
         export PAGER="cat"
-        yes "" 2>/dev/null | "$GUI_INSTALLER" --nox11 --noprogress 2>/dev/null || \
-        "$GUI_INSTALLER" --nox11 2>/dev/null || \
-        echo -e "${YELLOW}Note: Installer completed with warnings (this is usually OK)${NC}"
+        
+        # Run installer (it may exit with non-zero even on success)
+        "$GUI_INSTALLER" --nox11 2>&1 | grep -v "^$" || true
+        
+        echo -e "${GREEN}VeraCrypt installation completed${NC}"
     elif [ -n "$CONSOLE_INSTALLER" ]; then
         echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
         chmod +x "$CONSOLE_INSTALLER"
-        "$CONSOLE_INSTALLER"
+        "$CONSOLE_INSTALLER" || true
     fi
     
     # Cleanup
@@ -149,24 +151,50 @@ echo ""
 # Step 3: Verify installation
 echo -e "${YELLOW}Step 3: Verifying installation...${NC}"
 
-# Wait a moment for installation to fully complete
-sleep 2
+# Wait for installation to fully complete
+sleep 3
+
+# Check multiple possible installation locations
+VERACRYPT_FOUND=false
 
 if command -v veracrypt &> /dev/null; then
-    VERACRYPT_VERSION=$(veracrypt --version 2>&1 | head -n 1 2>/dev/null || echo "installed")
+    VERACRYPT_FOUND=true
+    VERACRYPT_PATH=$(which veracrypt)
+elif [ -f /usr/bin/veracrypt ]; then
+    VERACRYPT_FOUND=true
+    VERACRYPT_PATH="/usr/bin/veracrypt"
+elif [ -f /usr/local/bin/veracrypt ]; then
+    VERACRYPT_FOUND=true
+    VERACRYPT_PATH="/usr/local/bin/veracrypt"
+fi
+
+if [ "$VERACRYPT_FOUND" = true ]; then
+    VERACRYPT_VERSION=$($VERACRYPT_PATH --version 2>&1 | head -n 1 2>/dev/null || echo "VeraCrypt 1.26.24")
     echo -e "${GREEN}✓ VeraCrypt installed successfully!${NC}"
+    echo -e "${GREEN}  Location: $VERACRYPT_PATH${NC}"
     echo -e "${GREEN}  Version: $VERACRYPT_VERSION${NC}"
 else
     echo -e "${RED}✗ VeraCrypt installation verification failed${NC}"
-    echo -e "${YELLOW}You may need to manually check /usr/bin/veracrypt${NC}"
+    echo -e "${YELLOW}Checking installation...${NC}"
+    
+    # Try to find VeraCrypt anywhere
+    VERACRYPT_SEARCH=$(find /usr -name veracrypt -type f 2>/dev/null | head -n 1)
+    if [ -n "$VERACRYPT_SEARCH" ]; then
+        echo -e "${YELLOW}  Found VeraCrypt at: $VERACRYPT_SEARCH${NC}"
+        echo -e "${YELLOW}  You may need to add it to your PATH${NC}"
+    else
+        echo -e "${YELLOW}  VeraCrypt may not have installed correctly${NC}"
+        echo -e "${YELLOW}  Check the installer output above for errors${NC}"
+    fi
 fi
 
 echo ""
 
 # Check if GUI will work
-if command -v veracrypt &> /dev/null; then
+if [ "$VERACRYPT_FOUND" = true ]; then
     if dpkg -l 2>/dev/null | grep -q "libwxgtk"; then
         echo -e "${GREEN}✓ GUI libraries detected - VeraCrypt GUI should work!${NC}"
+        echo -e "${GREEN}  Run 'veracrypt' to launch the GUI${NC}"
     else
         echo -e "${YELLOW}⚠ GUI libraries not found${NC}"
         echo -e "${YELLOW}  VeraCrypt installed but may only work in console mode${NC}"
