@@ -1,0 +1,6 @@
+got stuck here:
+
+Setting up libtiff6:amd64 (4.5.1+git230720-4ubuntu2.4) ...
+Setting up
+
+for a few minutes

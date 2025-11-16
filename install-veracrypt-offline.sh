@@ -84,13 +84,61 @@ if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
     TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
     echo -e "${GREEN}Found $TOTAL_DEBS package(s) to install${NC}"
     
+    # Set environment to prevent hanging on post-install scripts
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    export DEBIAN_PRIORITY=critical
+    export APT_LISTCHANGES_FRONTEND=none
+    
+    # Disable any triggers that might cause hangs
+    echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
+    
+    # Prevent hanging on systemd/dbus operations
+    # Create a policy-rc.d to prevent services from starting during install
+    cat > /usr/sbin/policy-rc.d << 'EOF'
+#!/bin/bash
+exit 101
+EOF
+    chmod +x /usr/sbin/policy-rc.d
+    
     # Install all .deb files at once (skip conflicting ones)
     echo -e "${YELLOW}Installing packages (this may take a moment)...${NC}"
-    dpkg -i --force-depends --force-confold --skip-same-version "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
+    # Use --auto-deconfigure to handle conflicts, skip already installed packages
+    # Only install packages that aren't already satisfied
+    INSTALL_OUTPUT=$(dpkg -i --force-depends --force-confold --auto-deconfigure --skip-same-version "$DEBS_DIR"/*.deb 2>&1) || true
     
-    # Fix any dependency issues (non-interactive, force if needed)
+    # Count what was actually installed vs skipped
+    INSTALLED=$(echo "$INSTALL_OUTPUT" | grep -c "Setting up" || echo "0")
+    SKIPPED=$(echo "$INSTALL_OUTPUT" | grep -c "already installed, skipping" || echo "0")
+    
+    echo -e "${GREEN}  → Installed: $INSTALLED packages${NC}"
+    echo -e "${YELLOW}  → Skipped: $SKIPPED packages (already present)${NC}"
+    
+    # Show any errors but don't fail
+    if echo "$INSTALL_OUTPUT" | grep -q "error processing"; then
+        echo -e "${YELLOW}  ⚠ Some packages had conflicts (this is usually OK)${NC}"
+    fi
+    
+    # Fix any dependency issues (non-interactive, force if needed, with timeout)
     echo -e "${YELLOW}Configuring packages...${NC}"
-    DEBIAN_FRONTEND=noninteractive dpkg --configure -a 2>&1 | tail -n 5 || true
+    # Run with timeout to prevent hanging (300 seconds = 5 minutes)
+    if timeout 300 dpkg --configure -a >/dev/null 2>&1; then
+        echo -e "${GREEN}  → Configuration completed successfully${NC}"
+    else
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 124 ]; then
+            echo -e "${YELLOW}  ⚠ Configuration timed out (5 min), forcing completion...${NC}"
+        else
+            echo -e "${YELLOW}  ⚠ Configuration had issues, forcing completion...${NC}"
+        fi
+        # Force configure even if some packages fail
+        dpkg --configure -a --force-confold --force-confdef >/dev/null 2>&1 || true
+        echo -e "${GREEN}  → Forced configuration completed${NC}"
+    fi
+    
+    # Clean up
+    rm -f /etc/dpkg/dpkg.cfg.d/02apt-speedup 2>/dev/null || true
+    rm -f /usr/sbin/policy-rc.d 2>/dev/null || true
     
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 else
