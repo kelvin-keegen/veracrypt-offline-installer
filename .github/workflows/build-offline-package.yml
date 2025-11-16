@@ -1,5 +1,11 @@
 name: Build VeraCrypt Offline Package
 
+# Configuration for matching your offline system
+env:
+  TARGET_UBUNTU_VERSION: "24.04"  # Change this to match your offline PC
+  VERACRYPT_VERSION: "1.26.24"    # Latest VeraCrypt version
+  INCLUDE_WXWIDGETS: "true"       # Set to "false" if you don't need GUI
+
 on:
   push:
     branches:
@@ -8,17 +14,39 @@ on:
   workflow_dispatch:
     inputs:
       veracrypt_version:
-        description: 'VeraCrypt version'
+        description: 'VeraCrypt version (overrides env)'
         required: false
-        default: '1.26.24'
+        default: ''
+      target_ubuntu_version:
+        description: 'Target Ubuntu version (e.g., 24.04, 22.04)'
+        required: false
+        default: ''
 
 jobs:
   build-offline-package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Match the TARGET_UBUNTU_VERSION
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Set configuration
+        id: config
+        run: |
+          # Use workflow input if provided, otherwise use env
+          VERACRYPT_VER="${{ github.event.inputs.veracrypt_version }}"
+          if [ -z "$VERACRYPT_VER" ]; then
+            VERACRYPT_VER="${{ env.VERACRYPT_VERSION }}"
+          fi
+          
+          TARGET_VER="${{ github.event.inputs.target_ubuntu_version }}"
+          if [ -z "$TARGET_VER" ]; then
+            TARGET_VER="${{ env.TARGET_UBUNTU_VERSION }}"
+          fi
+          
+          echo "veracrypt_version=$VERACRYPT_VER" >> $GITHUB_OUTPUT
+          echo "target_version=$TARGET_VER" >> $GITHUB_OUTPUT
+          echo "Building for Ubuntu $TARGET_VER with VeraCrypt $VERACRYPT_VER"
 
       - name: Detect Debian/Ubuntu version
         id: detect-version
@@ -50,7 +78,7 @@ jobs:
 
       - name: Download VeraCrypt installer
         run: |
-          VERACRYPT_VERSION="${{ github.event.inputs.veracrypt_version || '1.26.24' }}"
+          VERACRYPT_VERSION="${{ steps.config.outputs.veracrypt_version }}"
           
           echo "Downloading VeraCrypt ${VERACRYPT_VERSION} (Generic Linux)"
           
@@ -87,15 +115,18 @@ jobs:
             }
           done
           
-          # Download wxWidgets WITHOUT dependencies (no GTK/system libs)
-          # This avoids version conflicts while providing GUI support
-          echo "Downloading wxWidgets (GUI library)..."
-          apt-get download libwxgtk3.2-1t64 2>/dev/null || \
-          apt-get download libwxgtk3.0-gtk3-0v5 2>/dev/null || \
-          echo "Warning: wxWidgets not available for this version"
-          
-          apt-get download libwxbase3.2-1t64 2>/dev/null || \
-          apt-get download libwxbase3.0-0v5 2>/dev/null || true
+          # Download wxWidgets if enabled (for GUI support)
+          if [ "${{ env.INCLUDE_WXWIDGETS }}" = "true" ]; then
+            echo "Downloading wxWidgets (GUI library)..."
+            apt-get download libwxgtk3.2-1t64 2>/dev/null || \
+            apt-get download libwxgtk3.0-gtk3-0v5 2>/dev/null || \
+            echo "Warning: wxWidgets not available for this version"
+            
+            apt-get download libwxbase3.2-1t64 2>/dev/null || \
+            apt-get download libwxbase3.0-0v5 2>/dev/null || true
+          else
+            echo "Skipping wxWidgets (INCLUDE_WXWIDGETS=false)"
+          fi
           
           # Remove duplicates (keep latest version only)
           for file in *.deb; do
@@ -168,12 +199,17 @@ jobs:
           
           echo "Checksums generated"
 
-      - name: Create ZIP package
+      - name: Create distribution package
         run: |
           cd build
+          
           OS_NAME="${{ steps.detect-version.outputs.os_name }}"
           OS_VER="${{ steps.detect-version.outputs.os_version }}"
-          PACKAGE_NAME="veracrypt-offline-debian-${OS_VER}-$(date +%Y%m%d).zip"
+          TARGET_VER="${{ steps.config.outputs.target_version }}"
+          VERACRYPT_VER="${{ steps.config.outputs.veracrypt_version }}"
+          
+          # Use target version in package name for clarity
+          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-ubuntu-${TARGET_VER}-$(date +%Y%m%d).zip"
           
           zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
           
@@ -182,6 +218,8 @@ jobs:
           
           echo "Created package: $PACKAGE_NAME"
           echo "Package size: $(du -h ../artifacts/$PACKAGE_NAME | cut -f1)"
+          echo "Target system: Ubuntu $TARGET_VER"
+          echo "VeraCrypt version: $VERACRYPT_VER"
 
       - name: Generate package summary
         run: |
@@ -202,7 +240,7 @@ jobs:
         with:
           name: veracrypt-offline-installer
           path: artifacts/*.zip
-          retention-days: 90
+          retention-days: 7
 
       - name: Create release (on tag)
         if: startsWith(github.ref, 'refs/tags/')
