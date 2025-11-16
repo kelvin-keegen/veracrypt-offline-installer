@@ -79,17 +79,30 @@ jobs:
       - name: Download VeraCrypt installer
         run: |
           VERACRYPT_VERSION="${{ steps.config.outputs.veracrypt_version }}"
+          OS_NAME="${{ steps.detect-version.outputs.os_name }}"
           
-          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} (Generic Linux)"
+          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for ${OS_NAME}"
           
-          # Download generic Linux setup (works on both Debian and Ubuntu)
-          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
-          
-          wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
-            "$VERACRYPT_URL" || {
-            echo "Error: Could not download VeraCrypt installer"
-            exit 1
-          }
+          # Download the appropriate DEB package for Ubuntu (easier to install offline)
+          if [ "$OS_NAME" = "ubuntu" ] || [ "$OS_NAME" = "Ubuntu" ]; then
+            # Ubuntu DEB package - much easier to install offline
+            VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-Ubuntu-24.04-amd64.deb"
+            
+            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-Ubuntu-24.04-amd64.deb" \
+              "$VERACRYPT_URL" || {
+              echo "Error: Could not download VeraCrypt .deb installer"
+              exit 1
+            }
+          else
+            # Fallback to generic Linux setup for other distros
+            VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2"
+            
+            wget -O "build/veracrypt-offline-installer/veracrypt/veracrypt-${VERACRYPT_VERSION}-setup.tar.bz2" \
+              "$VERACRYPT_URL" || {
+              echo "Error: Could not download VeraCrypt installer"
+              exit 1
+            }
+          fi
 
       - name: Download dependencies
         run: |

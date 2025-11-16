@@ -135,23 +135,36 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
         EXTRACT_DIR=$(mktemp -d)
         INSTALL_SUCCESS=false
         
-        # Method 1: Try --tar xvf (makeself option)
-        if "$GUI_INSTALLER" --tar xvf 2>&1 | grep -q "veracrypt"; then
-            echo -e "${GREEN}Extraction successful${NC}"
+        # Method 1: Extract the makeself archive using --target
+        "$GUI_INSTALLER" --target "$EXTRACT_DIR" --noexec 2>&1 | grep -v "^$" | head -10
+        
+        # The extracted archive contains an installer script (veracrypt_install_gui_x64.sh or similar)
+        # We need to run it or extract files from it
+        INNER_INSTALLER=$(find "$EXTRACT_DIR" -name "veracrypt_install*.sh" -type f | head -1)
+        
+        if [ -n "$INNER_INSTALLER" ] && [ -f "$INNER_INSTALLER" ]; then
+            echo -e "${GREEN}Found VeraCrypt installer script${NC}"
+            chmod +x "$INNER_INSTALLER"
             
-            # Files are extracted to current directory by makeself
-            # Find and copy the extracted files
-            if [ -f "./veracrypt" ]; then
-                install -D -m 755 "./veracrypt" /usr/bin/veracrypt
+            # Extract the inner installer to another temp directory
+            INNER_EXTRACT=$(mktemp -d)
+            "$INNER_INSTALLER" --target "$INNER_EXTRACT" --noexec 2>&1 | grep -v "^$" | head -5
+            
+            # Look for veracrypt binary in the extracted content
+            if [ -f "$INNER_EXTRACT/usr/bin/veracrypt" ]; then
+                install -D -m 755 "$INNER_EXTRACT/usr/bin/veracrypt" /usr/bin/veracrypt
                 INSTALL_SUCCESS=true
+                echo -e "${GREEN}✓ Installed VeraCrypt binary${NC}"
             fi
             
-            if [ -f "./veracrypt.desktop" ]; then
-                install -D -m 644 "./veracrypt.desktop" /usr/share/applications/veracrypt.desktop
+            # Look for desktop file
+            if [ -f "$INNER_EXTRACT/usr/share/applications/veracrypt.desktop" ]; then
+                install -D -m 644 "$INNER_EXTRACT/usr/share/applications/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
+                echo -e "${GREEN}✓ Installed desktop entry${NC}"
             fi
             
-            # Clean up extracted files
-            rm -f ./veracrypt ./veracrypt.desktop 2>/dev/null
+            # Clean up inner extraction
+            rm -rf "$INNER_EXTRACT" 2>/dev/null
         fi
         
         # Method 2: If method 1 failed, try using --target with extraction
