@@ -87,8 +87,15 @@ jobs:
             }
           done
           
-          # Don't download wxWidgets, GTK, or dbus - these must already be on the system
-          # VeraCrypt will use system-installed versions
+          # Download wxWidgets WITHOUT dependencies (no GTK/system libs)
+          # This avoids version conflicts while providing GUI support
+          echo "Downloading wxWidgets (GUI library)..."
+          apt-get download libwxgtk3.2-1t64 2>/dev/null || \
+          apt-get download libwxgtk3.0-gtk3-0v5 2>/dev/null || \
+          echo "Warning: wxWidgets not available for this version"
+          
+          apt-get download libwxbase3.2-1t64 2>/dev/null || \
+          apt-get download libwxbase3.0-0v5 2>/dev/null || true
           
           # Remove duplicates (keep latest version only)
           for file in *.deb; do

@@ -70,12 +70,8 @@ elif dpkg -l | grep -q "libwxgtk2.8"; then
 fi
 
 if [ "$WX_INSTALLED" = false ]; then
-    echo -e "${RED}  ✗ wxWidgets not found${NC}"
-    echo -e "${YELLOW}Installing wxWidgets for GUI support...${NC}"
-    echo -e "${YELLOW}This requires internet access. Install with:${NC}"
-    echo -e "${GREEN}    sudo apt-get install libwxgtk3.2-1 || sudo apt-get install libwxgtk3.0-gtk3-0v5${NC}"
-    echo ""
-    echo -e "${YELLOW}Continuing anyway - VeraCrypt may install console version only${NC}"
+    echo -e "${YELLOW}  ℹ wxWidgets not currently installed${NC}"
+    echo -e "${YELLOW}  → Will be installed from offline packages if available${NC}"
 fi
 
 echo ""
@@ -90,9 +86,9 @@ if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
     
     # Install all .deb files at once (skip conflicting ones)
     echo -e "${YELLOW}Installing packages (this may take a moment)...${NC}"
-    dpkg -i --force-confold --skip-same-version "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
+    dpkg -i --force-depends --force-confold --skip-same-version "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
     
-    # Fix any dependency issues (non-interactive)
+    # Fix any dependency issues (non-interactive, force if needed)
     echo -e "${YELLOW}Configuring packages...${NC}"
     DEBIAN_FRONTEND=noninteractive dpkg --configure -a 2>&1 | tail -n 5 || true
     
@@ -163,6 +159,19 @@ if command -v veracrypt &> /dev/null; then
 else
     echo -e "${RED}✗ VeraCrypt installation verification failed${NC}"
     echo -e "${YELLOW}You may need to manually check /usr/bin/veracrypt${NC}"
+fi
+
+echo ""
+
+# Check if GUI will work
+if command -v veracrypt &> /dev/null; then
+    if dpkg -l 2>/dev/null | grep -q "libwxgtk"; then
+        echo -e "${GREEN}✓ GUI libraries detected - VeraCrypt GUI should work!${NC}"
+    else
+        echo -e "${YELLOW}⚠ GUI libraries not found${NC}"
+        echo -e "${YELLOW}  VeraCrypt installed but may only work in console mode${NC}"
+        echo -e "${YELLOW}  Check if wxWidgets packages were in the debs/ folder${NC}"
+    fi
 fi
 
 echo ""

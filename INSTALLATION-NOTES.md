@@ -1,26 +1,18 @@
 # Installation Notes
 
-## Prerequisites for GUI Version
+## For Completely Offline Systems
 
-**IMPORTANT:** VeraCrypt GUI requires wxWidgets, which must already be installed on your system.
+**Good news!** The offline package now includes wxWidgets for GUI support.
 
-### Before running the offline installer:
+### Important Note:
+The wxWidgets packages are downloaded from the **build system** (Ubuntu latest). If your offline machine runs a different version, there may be dependency conflicts.
 
-Check if wxWidgets is installed:
-```bash
-dpkg -l | grep libwxgtk
-```
+**Best practice:**
+1. Build the package on the **same OS version** as your offline machine
+2. Or accept that wxWidgets may fail to install (VeraCrypt will still work in console mode)
 
-If nothing appears, install it (requires internet):
-```bash
-# Ubuntu 24.04+
-sudo apt-get install libwxgtk3.2-1
-
-# Ubuntu 22.04 or older
-sudo apt-get install libwxgtk3.0-gtk3-0v5
-```
-
-**Why not included?** wxWidgets depends on many GTK/system libraries. Including them would upgrade your system packages and potentially break your desktop environment (as seen in the logs with gnome-shell).
+### Using `--force-depends` flag
+The installer uses `--force-depends` to skip dependency version mismatches. This allows installation even if some dependencies have minor version differences.
 
 ## GUI vs Console Version
 
