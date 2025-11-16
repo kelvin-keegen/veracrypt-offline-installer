@@ -1,0 +1,26 @@
+FROM ubuntu:24.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal GUI dependencies that would be on a desktop Ubuntu install
+RUN apt-get update && apt-get install -y \
+    sudo \
+    libfuse2t64 \
+    libglib2.0-0t64 \
+    libgtk-3-0t64 \
+    xauth \
+    x11-apps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a test user (similar to your offline PC)
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set working directory
+WORKDIR /home/testuser/veracrypt-test
+
+# Switch to test user
+USER testuser
+
+CMD ["/bin/bash"]

@@ -75,11 +75,25 @@ cd "${PACKAGE_DIR}/debs"
 sudo apt-get update -qq
 
 DEPENDENCIES=(
-    "libfuse2"
+    "libfuse2t64"
     "dmsetup"
     "sudo"
-    "libwxgtk3.0-gtk3-0v5"
-    "libwxbase3.0-0v5"
+    "pcscd"
+    "libccid"
+    "libwxgtk3.2-1t64"
+    "libwxbase3.2-1t64"
+    "libayatana-appindicator3-1"
+    "libayatana-indicator3-7"
+    "libayatana-ido3-0.4-0"
+    "libdbusmenu-glib4"
+    "libdbusmenu-gtk3-4"
+    "libgtk-3-0t64"
+    "libcurl4t64"
+    "libpcre2-32-0"
+    "libnotify4"
+    "libusb-1.0-0"
+    "libpcsclite1"
+    "libpolkit-gobject-1-0"
 )
 
 for package in "${DEPENDENCIES[@]}"; do

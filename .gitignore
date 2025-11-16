@@ -19,3 +19,6 @@ sample_volume
 # Log files
 *.log
 install.log
+test-package/
+artifacts/
+build/

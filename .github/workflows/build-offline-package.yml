@@ -98,34 +98,56 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Minimal dependencies - only what's NOT already on most systems
+          # Complete dependencies for Ubuntu 24.04 offline installation
           DEPENDENCIES=(
             "libfuse2t64"
-            "libfuse2"
+            "dmsetup"
             "pcscd"
             "libccid"
-            "dmsetup"
+            "libwxgtk3.2-1t64"
+            "libwxbase3.2-1t64"
+            "libayatana-appindicator3-1"
+            "libayatana-indicator3-7"
+            "libayatana-ido3-0.4-0"
+            "libdbusmenu-glib4"
+            "libdbusmenu-gtk3-4"
+            "libgtk-3-0t64"
+            "libcurl4t64"
+            "libpcre2-32-0"
+            "libnotify4"
+            "libusb-1.0-0"
+            "libpcsclite1"
+            "libpolkit-gobject-1-0"
           )
           
-          # Download packages only (no dependencies to avoid conflicts)
+          # Download packages
           for package in "${DEPENDENCIES[@]}"; do
             echo "Downloading $package..."
             apt-get download "$package" 2>/dev/null || {
-              echo "Warning: Could not download $package (may not be needed on target system)"
+              echo "Warning: Could not download $package"
             }
           done
           
-          # Download wxWidgets if enabled (for GUI support)
-          if [ "${{ env.INCLUDE_WXWIDGETS }}" = "true" ]; then
-            echo "Downloading wxWidgets (GUI library)..."
-            apt-get download libwxgtk3.2-1t64 2>/dev/null || \
-            apt-get download libwxgtk3.0-gtk3-0v5 2>/dev/null || \
-            echo "Warning: wxWidgets not available for this version"
-            
-            apt-get download libwxbase3.2-1t64 2>/dev/null || \
-            apt-get download libwxbase3.0-0v5 2>/dev/null || true
-          else
-            echo "Skipping wxWidgets (INCLUDE_WXWIDGETS=false)"
+          # Download transitive dependencies (without installing)
+          for package in "${DEPENDENCIES[@]}"; do
+            apt-cache depends --recurse --no-recommends --no-suggests \
+              --no-conflicts --no-breaks --no-replaces --no-enhances \
+              "$package" 2>/dev/null | grep "^\w" | sort -u | \
+              xargs -r apt-get download 2>/dev/null || true
+          done
+          
+          # Remove duplicate packages (keep newest version)
+          for file in *.deb; do
+            [ -f "$file" ] || continue
+            basename="${file%%_*}"
+            count=$(ls -1 "${basename}"_*.deb 2>/dev/null | wc -l)
+            if [ "$count" -gt 1 ]; then
+              ls -1t "${basename}"_*.deb | tail -n +2 | xargs rm -f 2>/dev/null || true
+            fi
+          done
+          
+          DEB_COUNT=$(ls -1 *.deb 2>/dev/null | wc -l)
+          echo "Downloaded ${DEB_COUNT} package files"
           fi
           
           # Remove duplicates (keep latest version only)
