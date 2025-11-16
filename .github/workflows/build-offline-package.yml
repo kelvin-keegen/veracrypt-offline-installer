@@ -75,7 +75,9 @@ jobs:
             "libfuse2t64"
             "libfuse2"
             "pcscd"
+            "libccid"
             "dmsetup"
+            "dbus-x11"
             "libwxgtk3.2-1t64"
             "libwxgtk3.0-gtk3-0v5"
           )
@@ -89,11 +91,15 @@ jobs:
               echo "Warning: Could not download $package (may not be needed on target system)"
               continue
             }
-            
-            # Download only direct dependencies (not recursive to reduce package count)
+          done
+          
+          # Download common dependencies separately to avoid version conflicts
+          echo "Downloading common dependencies..."
+          for package in "${DEPENDENCIES[@]}"; do
             apt-cache depends --no-recommends --no-suggests \
               --no-conflicts --no-breaks --no-replaces --no-enhances \
               "$package" | grep "Depends:" | awk '{print $2}' | \
+              grep -v "^libc6$" | grep -v "^libgcc" | grep -v "^libstdc" | \
               xargs -r apt-get download 2>/dev/null || true
           done
           

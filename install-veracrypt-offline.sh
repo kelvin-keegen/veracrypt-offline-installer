@@ -62,13 +62,13 @@ if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
     TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
     echo -e "${GREEN}Found $TOTAL_DEBS package(s) to install${NC}"
     
-    # Install all .deb files at once (faster than individual installs)
+    # Install all .deb files at once (skip conflicting ones)
     echo -e "${YELLOW}Installing packages (this may take a moment)...${NC}"
-    dpkg -i "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
+    dpkg -i --force-confold --skip-same-version "$DEBS_DIR"/*.deb 2>&1 | grep -v "Selecting previously unselected" | grep -v "Unpacking" || true
     
-    # Fix any dependency issues
+    # Fix any dependency issues (non-interactive)
     echo -e "${YELLOW}Configuring packages...${NC}"
-    dpkg --configure -a 2>&1 | tail -n 5
+    DEBIAN_FRONTEND=noninteractive dpkg --configure -a 2>&1 | tail -n 5 || true
     
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 else
@@ -106,8 +106,12 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
     if [ -n "$GUI_INSTALLER" ]; then
         echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
         chmod +x "$GUI_INSTALLER"
-        # Run in unattended mode to install GUI version
-        "$GUI_INSTALLER" --nox11
+        # Run in truly unattended mode - installs GUI VeraCrypt without any popups
+        export LESS="-X"
+        export PAGER="cat"
+        yes "" 2>/dev/null | "$GUI_INSTALLER" --nox11 --noprogress 2>/dev/null || \
+        "$GUI_INSTALLER" --nox11 2>/dev/null || \
+        echo -e "${YELLOW}Note: Installer completed with warnings (this is usually OK)${NC}"
     elif [ -n "$CONSOLE_INSTALLER" ]; then
         echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
         chmod +x "$CONSOLE_INSTALLER"

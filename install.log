@@ -1,0 +1,280 @@
+[H[2J[3J[0;34m╔════════════════════════════════════════════╗[0m
+[0;34m║  VeraCrypt Offline Installation Helper    ║[0m
+[0;34m╔════════════════════════════════════════════╗[0m
+
+[1;33mCurrent Status:[0m
+  [0;32m✓[0m Dependencies downloaded
+  [0;32m✓[0m VeraCrypt installer present
+  [0;31m✗[0m VeraCrypt not installed
+
+[1;33mAvailable Actions:[0m
+
+1. Download dependencies (requires internet)
+2. Install VeraCrypt offline (no internet needed)
+3. Verify installation
+4. Launch VeraCrypt
+5. View README
+6. View installation checklist
+7. Uninstall VeraCrypt
+8. Exit
+
+Select an option [1-8]: 
+[1;33mStarting offline installation...[0m
+[0;31mThis requires sudo privileges.[0m
+
+[0;32m================================[0m
+[0;32mVeraCrypt Offline Installer[0m
+[0;32m================================[0m
+
+[0;32mFound VeraCrypt installer: veracrypt-1.26.7-setup.tar.bz2[0m
+
+[1;33mStep 1: Installing dependencies...[0m
+[0;32mFound 25 package(s) to install[0m
+[1;33mInstalling packages (this may take a moment)...[0m
+(Reading database ... 210655 files and directories currently installed.)
+Preparing to unpack .../dmsetup_2%3a1.02.185-3ubuntu3.2_amd64.deb ...
+Preparing to unpack .../libc6_2.39-0ubuntu8.6_amd64.deb ...
+Preparing to unpack .../libcairo2_1.18.0-3build1_amd64.deb ...
+Preparing to unpack .../libdevmapper1.02.1_2%3a1.02.185-3ubuntu3.2_amd64.deb ...
+Preparing to unpack .../libfontconfig1_2.15.0-1.1ubuntu2_amd64.deb ...
+Preparing to unpack .../libfuse2t64_2.9.9-8.1build1_amd64.deb ...
+Preparing to unpack .../libgcc-s1_14.2.0-4ubuntu2~24.04_amd64.deb ...
+Preparing to unpack .../libgdk-pixbuf-2.0-0_2.42.10+dfsg-3ubuntu3.2_amd64.deb ...
+dpkg: regarding .../libglib2.0-0t64_2.80.0-6ubuntu3.4_amd64.deb containing libglib2.0-0t64:amd64:
+ libglib2.0-0t64:amd64 breaks gnome-shell (<< 46.0-0ubuntu5.1~)
+  gnome-shell (version 46.0-0ubuntu5) is present and installed.
+
+dpkg: error processing archive /home/ubuntu/Desktop/veracrypt-offline-installer/veracrypt-offline-debian-trixie-sid-20251116/veracrypt-offline-installer/debs/libglib2.0-0t64_2.80.0-6ubuntu3.4_amd64.deb (--install):
+ installing libglib2.0-0t64:amd64 would break gnome-shell, and
+ deconfiguration is not permitted (--auto-deconfigure might help)
+Preparing to unpack .../libgtk-3-0t64_3.24.41-4ubuntu1.3_amd64.deb ...
+Preparing to unpack .../libjpeg8_8c-2ubuntu11_amd64.deb ...
+Preparing to unpack .../libnotify4_0.8.3-1build2_amd64.deb ...
+Preparing to unpack .../libpango-1.0-0_1.52.1+ds-1build1_amd64.deb ...
+Preparing to unpack .../libpangocairo-1.0-0_1.52.1+ds-1build1_amd64.deb ...
+Preparing to unpack .../libpangoft2-1.0-0_1.52.1+ds-1build1_amd64.deb ...
+Preparing to unpack .../libpng16-16t64_1.6.43-5build1_amd64.deb ...
+Preparing to unpack .../libsm6_2%3a1.2.3-1build3_amd64.deb ...
+Preparing to unpack .../libstdc++6_14.2.0-4ubuntu2~24.04_amd64.deb ...
+Preparing to unpack .../libtiff6_4.5.1+git230720-4ubuntu2.4_amd64.deb ...
+Preparing to unpack .../libwxbase3.2-1t64_3.2.4+dfsg-4build1_amd64.deb ...
+Preparing to unpack .../libwxgtk3.2-1t64_3.2.4+dfsg-4build1_amd64.deb ...
+Preparing to unpack .../libx11-6_2%3a1.8.7-1build1_amd64.deb ...
+Preparing to unpack .../libxkbcommon0_1.6.0-1build1_amd64.deb ...
+Preparing to unpack .../libxtst6_2%3a1.2.3-1.1build1_amd64.deb ...
+Preparing to unpack .../pcscd_2.0.3-1build1_amd64.deb ...
+dpkg: dependency problems prevent configuration of libgcc-s1:amd64:
+ libgcc-s1:amd64 depends on gcc-14-base (= 14.2.0-4ubuntu2~24.04); however:
+  Version of gcc-14-base:amd64 on system is 14-20240412-0ubuntu1.
+
+dpkg: error processing package libgcc-s1:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libgdk-pixbuf-2.0-0:amd64:
+ libgdk-pixbuf-2.0-0:amd64 depends on libgdk-pixbuf2.0-common (>= 2.42.10+dfsg-3ubuntu3.2); however:
+  Version of libgdk-pixbuf2.0-common on system is 2.42.10+dfsg-3ubuntu3.
+
+dpkg: error processing package libgdk-pixbuf-2.0-0:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libgtk-3-0t64:amd64:
+ libgtk-3-0t64:amd64 depends on libgdk-pixbuf-2.0-0 (>= 2.40.0); however:
+  Package libgdk-pixbuf-2.0-0:amd64 is not configured yet.
+ libgtk-3-0t64:amd64 depends on libgtk-3-common (>= 3.24.41-4ubuntu1.3); however:
+  Version of libgtk-3-common on system is 3.24.41-4ubuntu1.
+
+dpkg: error processing package libgtk-3-0t64:amd64 (--install):
+ dependency problems - leaving unconfigured
+Setting up libjpeg8:amd64 (8c-2ubuntu11) ...
+dpkg: dependency problems prevent configuration of libnotify4:amd64:
+ libnotify4:amd64 depends on libgdk-pixbuf-2.0-0 (>= 2.22.0); however:
+  Package libgdk-pixbuf-2.0-0:amd64 is not configured yet.
+
+dpkg: error processing package libnotify4:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libstdc++6:amd64:
+ libstdc++6:amd64 depends on gcc-14-base (= 14.2.0-4ubuntu2~24.04); however:
+  Version of gcc-14-base:amd64 on system is 14-20240412-0ubuntu1.
+ libstdc++6:amd64 depends on libgcc-s1 (>= 4.3); however:
+  Package libgcc-s1:amd64 is not configured yet.
+
+dpkg: error processing package libstdc++6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libwxbase3.2-1t64:amd64:
+ libwxbase3.2-1t64:amd64 depends on libgcc-s1 (>= 3.3.1); however:
+  Package libgcc-s1:amd64 is not configured yet.
+ libwxbase3.2-1t64:amd64 depends on libstdc++6 (>= 13.1); however:
+  Package libstdc++6:amd64 is not configured yet.
+
+dpkg: error processing package libwxbase3.2-1t64:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libwxgtk3.2-1t64:amd64:
+ libwxgtk3.2-1t64:amd64 depends on libgcc-s1 (>= 3.3.1); however:
+  Package libgcc-s1:amd64 is not configured yet.
+ libwxgtk3.2-1t64:amd64 depends on libgdk-pixbuf-2.0-0 (>= 2.22.0); however:
+  Package libgdk-pixbuf-2.0-0:amd64 is not configured yet.
+ libwxgtk3.2-1t64:amd64 depends on libgtk-3-0t64 (>= 3.22.25); however:
+  Package libgtk-3-0t64:amd64 is not configured yet.
+ libwxgtk3.2-1t64:amd64 depends on libnotify4 (>= 0.7.0); however:
+  Package libnotify4:amd64 is not configured yet.
+ libwxgtk3.2-1t64:amd64 depends on libstdc++6 (>= 13.1); however:
+  Package libstdc++6:amd64 is not configured yet.
+ libwxgtk3.2-1t64:amd64 depends on libwxbase3.2-1t64 (>= 3.2.4+dfsg); however:
+  Package libwxbase3.2-1t64:amd64 is not configured yet.
+
+dpkg: error processing package libwxgtk3.2-1t64:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of pcscd:
+ pcscd depends on libccid | pcsc-ifd-handler; however:
+  Package libccid is not installed.
+  Package pcsc-ifd-handler is not installed.
+
+dpkg: error processing package pcscd (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libc6:amd64:
+ libc6:amd64 depends on libgcc-s1; however:
+  Package libgcc-s1:amd64 is not configured yet.
+
+dpkg: error processing package libc6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libcairo2:amd64:
+ libcairo2:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libcairo2:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libdevmapper1.02.1:amd64:
+ libdevmapper1.02.1:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libdevmapper1.02.1:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libfontconfig1:amd64:
+ libfontconfig1:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libfontconfig1:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libfuse2t64:amd64:
+ libfuse2t64:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libfuse2t64:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libpango-1.0-0:amd64:
+ libpango-1.0-0:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libpango-1.0-0:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libpangocairo-1.0-0:amd64:
+ libpangocairo-1.0-0:amd64 depends on libc6 (>= 2.4); however:
+  Package libc6:amd64 is not configured yet.
+ libpangocairo-1.0-0:amd64 depends on libcairo2 (>= 1.8.0); however:
+  Package libcairo2:amd64 is not configured yet.
+ libpangocairo-1.0-0:amd64 depends on libfontconfig1 (>= 2.12.6); however:
+  Package libfontconfig1:amd64 is not configured yet.
+ libpangocairo-1.0-0:amd64 depends on libpango-1.0-0 (= 1.52.1+ds-1build1); however:
+  Package libpango-1.0-0:amd64 is not configured yet.
+
+dpkg: error processing package libpangocairo-1.0-0:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libpangoft2-1.0-0:amd64:
+ libpangoft2-1.0-0:amd64 depends on libc6 (>= 2.4); however:
+  Package libc6:amd64 is not configured yet.
+ libpangoft2-1.0-0:amd64 depends on libfontconfig1 (>= 2.13.0); however:
+  Package libfontconfig1:amd64 is not configured yet.
+ libpangoft2-1.0-0:amd64 depends on libpango-1.0-0 (= 1.52.1+ds-1build1); however:
+  Package libpango-1.0-0:amd64 is not configured yet.
+
+dpkg: error processing package libpangoft2-1.0-0:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libpng16-16t64:amd64:
+ libpng16-16t64:amd64 depends on libc6 (>= 2.29); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libpng16-16t64:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libsm6:amd64:
+ libsm6:amd64 depends on libc6 (>= 2.14); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libsm6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libtiff6:amd64:
+ libtiff6:amd64 depends on libc6 (>= 2.33); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libtiff6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libx11-6:amd64:
+ libx11-6:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libx11-6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libxkbcommon0:amd64:
+ libxkbcommon0:amd64 depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+
+dpkg: error processing package libxkbcommon0:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of libxtst6:amd64:
+ libxtst6:amd64 depends on libc6 (>= 2.4); however:
+  Package libc6:amd64 is not configured yet.
+ libxtst6:amd64 depends on libx11-6 (>= 2:1.6.0); however:
+  Package libx11-6:amd64 is not configured yet.
+
+dpkg: error processing package libxtst6:amd64 (--install):
+ dependency problems - leaving unconfigured
+dpkg: dependency problems prevent configuration of dmsetup:
+ dmsetup depends on libc6 (>= 2.38); however:
+  Package libc6:amd64 is not configured yet.
+ dmsetup depends on libdevmapper1.02.1 (>= 2:1.02.181); however:
+  Package libdevmapper1.02.1:amd64 is not configured yet.
+
+dpkg: error processing package dmsetup (--install):
+ dependency problems - leaving unconfigured
+Processing triggers for initramfs-tools (0.142ubuntu25) ...
+update-initramfs is disabled since running on read-only media
+Errors were encountered while processing:
+ /home/ubuntu/Desktop/veracrypt-offline-installer/veracrypt-offline-debian-trixie-sid-20251116/veracrypt-offline-installer/debs/libglib2.0-0t64_2.80.0-6ubuntu3.4_amd64.deb
+ libgcc-s1:amd64
+ libgdk-pixbuf-2.0-0:amd64
+ libgtk-3-0t64:amd64
+ libnotify4:amd64
+ libstdc++6:amd64
+ libwxbase3.2-1t64:amd64
+ libwxgtk3.2-1t64:amd64
+ pcscd
+ libc6:amd64
+ libcairo2:amd64
+ libdevmapper1.02.1:amd64
+ libfontconfig1:amd64
+ libfuse2t64:amd64
+ libpango-1.0-0:amd64
+ libpangocairo-1.0-0:amd64
+ libpangoft2-1.0-0:amd64
+ libpng16-16t64:amd64
+ libsm6:amd64
+ libtiff6:amd64
+ libx11-6:amd64
+ libxkbcommon0:amd64
+ libxtst6:amd64
+ dmsetup
+[1;33mConfiguring packages...[0m
+ libcairo2:amd64
+ libnotify4:amd64
+ libpng16-16t64:amd64
+ man-db
+ libc-bin
+[0;32mDependencies installed successfully.[0m
+
+[1;33mStep 2: Installing VeraCrypt...[0m
+[0;32mExtracting VeraCrypt installer...[0m
+[0;32mInstalling VeraCrypt with GUI support...[0m
+Verifying archive integrity...     0%    39%    79%  100%   All good.
+Uncompressing VeraCrypt 1.26.7 Installer     0%    39%    79%  100%  
+# Option “-e” is deprecated and might be removed in a later version of gnome-terminal.
+# Use “-- ” to terminate the options and put the command line to execute after it.
+# Error constructing proxy for org.gnome.Terminal:/org/gnome/Terminal/Factory0: Failed to execute child process “dbus-launch” (No such file or directory)
+
+[0;34mPress Enter to exit...[0m
