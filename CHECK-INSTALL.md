@@ -1,62 +1,104 @@
 # Quick Check - Is VeraCrypt Installed?
 
-Based on your log, the installer ran but verification failed. Let's check:
+Based on your log, wxWidgets installed successfully! Let's verify VeraCrypt:
 
 ## Step 1: Check if VeraCrypt binary exists
 
 ```bash
+# Try to run it
+veracrypt --version
+
+# If that fails, check these locations:
 ls -la /usr/bin/veracrypt
+ls -la /usr/local/bin/veracrypt
+
+# Search everywhere
+sudo find /usr -name veracrypt -type f 2>/dev/null
 ```
 
-If you see a file, VeraCrypt IS installed!
+## Step 2: If VeraCrypt is not found
 
-## Step 2: Check what was installed
+The installer ran but may have failed silently. Try manual installation:
 
 ```bash
-find /usr -name "*veracrypt*" 2>/dev/null
+cd /path/to/veracrypt-offline-installer/veracrypt
+tar -xjf veracrypt-1.26.24-setup.tar.bz2
+cd veracrypt-*
+chmod +x veracrypt-*-setup-gui-x64
+sudo ./veracrypt-*-setup-gui-x64 --nox11
 ```
 
-This will show all VeraCrypt files on your system.
-
-## Step 3: Try to run it
+## Step 3: Verify wxWidgets is installed
 
 ```bash
-veracrypt --help
+dpkg -l | grep libwxgtk
 ```
 
-If this shows help text, VeraCrypt works!
-
-## Step 4: Install wxWidgets for GUI
-
-If VeraCrypt is installed but you want the GUI:
-
-```bash
-# First, check your Ubuntu version
-lsb_release -a
-
-# For Ubuntu 24.04+
-sudo apt-get update
-sudo apt-get install libwxgtk3.2-1
-
-# For Ubuntu 22.04 or older
-sudo apt-get update
-sudo apt-get install libwxgtk3.0-gtk3-0v5
+You should see:
+```
+ii  libwxgtk3.2-1t64:amd64  3.2.4+dfsg-4build1  amd64
+ii  libwxbase3.2-1t64:amd64 3.2.4+dfsg-4build1  amd64
 ```
 
-Then run:
+✅ **This shows wxWidgets IS installed from your logs!**
+
+## Step 4: Launch VeraCrypt GUI
+
+If VeraCrypt is installed:
+
 ```bash
 veracrypt
 ```
 
-The GUI should now open!
+A graphical window should open!
 
----
+## Common Issues
 
-## What went wrong in your install?
+### Issue: "veracrypt: command not found"
 
-The offline package tried to install newer GTK/wxWidgets libraries that conflicted with your system:
-- `libglib2.0-0t64` would break `gnome-shell`
-- `libgtk-3-0t64` depends on newer `libgdk-pixbuf` 
-- `libwxgtk3.2-1t64` depends on the newer GTK
+**Solution 1:** Add to PATH
+```bash
+# Find where it's installed
+VERACRYPT_PATH=$(sudo find /usr -name veracrypt -type f 2>/dev/null | head -n 1)
 
-**Solution:** Don't include wxWidgets in the offline package. Users must install it separately with internet access (just once), then the offline installer will work.
+# If found, create symlink
+if [ -n "$VERACRYPT_PATH" ]; then
+    sudo ln -s "$VERACRYPT_PATH" /usr/local/bin/veracrypt
+fi
+```
+
+**Solution 2:** Reinstall manually (see Step 2 above)
+
+### Issue: "Text file busy" during verification
+
+This is normal - it means the binary was being written when we tried to check it. Just wait a few seconds and try again:
+
+```bash
+sleep 5
+veracrypt --version
+```
+
+## What Went Right
+
+From your logs:
+✅ wxWidgets installed successfully  
+✅ All dependencies installed  
+✅ Kernel modules loaded (dm-crypt, dm-mod, loop)  
+✅ Installer ran (though possibly twice)
+
+## What to Check
+
+❓ VeraCrypt binary location  
+❓ Whether installer actually created the files
+
+Run this comprehensive check:
+```bash
+echo "=== Checking VeraCrypt installation ==="
+which veracrypt
+ls -la /usr/bin/veracrypt 2>/dev/null || echo "Not in /usr/bin"
+ls -la /usr/local/bin/veracrypt 2>/dev/null || echo "Not in /usr/local/bin"
+sudo find /usr -name "*veracrypt*" -type f 2>/dev/null | head -10
+dpkg -l | grep libwxgtk
+```
+
+This will show exactly what's installed and where.
