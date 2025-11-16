@@ -54,6 +54,32 @@ fi
 echo -e "${GREEN}Found VeraCrypt installer: $(basename $VERACRYPT_INSTALLER)${NC}"
 echo ""
 
+# Check for wxWidgets (required for GUI version)
+echo -e "${YELLOW}Checking for GUI dependencies...${NC}"
+WX_INSTALLED=false
+
+if dpkg -l | grep -q "libwxgtk3.2-1"; then
+    echo -e "${GREEN}  ✓ Found libwxgtk3.2${NC}"
+    WX_INSTALLED=true
+elif dpkg -l | grep -q "libwxgtk3.0"; then
+    echo -e "${GREEN}  ✓ Found libwxgtk3.0${NC}"
+    WX_INSTALLED=true
+elif dpkg -l | grep -q "libwxgtk2.8"; then
+    echo -e "${GREEN}  ✓ Found libwxgtk2.8${NC}"
+    WX_INSTALLED=true
+fi
+
+if [ "$WX_INSTALLED" = false ]; then
+    echo -e "${RED}  ✗ wxWidgets not found${NC}"
+    echo -e "${YELLOW}Installing wxWidgets for GUI support...${NC}"
+    echo -e "${YELLOW}This requires internet access. Install with:${NC}"
+    echo -e "${GREEN}    sudo apt-get install libwxgtk3.2-1 || sudo apt-get install libwxgtk3.0-gtk3-0v5${NC}"
+    echo ""
+    echo -e "${YELLOW}Continuing anyway - VeraCrypt may install console version only${NC}"
+fi
+
+echo ""
+
 # Step 1: Install dependencies from local .deb files
 echo -e "${YELLOW}Step 1: Installing dependencies...${NC}"
 

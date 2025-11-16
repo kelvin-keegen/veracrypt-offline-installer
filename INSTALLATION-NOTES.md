@@ -1,5 +1,27 @@
 # Installation Notes
 
+## Prerequisites for GUI Version
+
+**IMPORTANT:** VeraCrypt GUI requires wxWidgets, which must already be installed on your system.
+
+### Before running the offline installer:
+
+Check if wxWidgets is installed:
+```bash
+dpkg -l | grep libwxgtk
+```
+
+If nothing appears, install it (requires internet):
+```bash
+# Ubuntu 24.04+
+sudo apt-get install libwxgtk3.2-1
+
+# Ubuntu 22.04 or older
+sudo apt-get install libwxgtk3.0-gtk3-0v5
+```
+
+**Why not included?** wxWidgets depends on many GTK/system libraries. Including them would upgrade your system packages and potentially break your desktop environment (as seen in the logs with gnome-shell).
+
 ## GUI vs Console Version
 
 **Important:** The installer script installs the **GUI version** of VeraCrypt, NOT the console version.

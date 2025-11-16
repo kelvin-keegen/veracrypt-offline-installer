@@ -70,7 +70,7 @@ jobs:
           # Update package lists
           sudo apt-get update
           
-          # Core dependencies only (minimal set for VeraCrypt GUI)
+          # Minimal dependencies - only what's NOT already on most systems
           DEPENDENCIES=(
             "libfuse2t64"
             "libfuse2"
@@ -78,30 +78,18 @@ jobs:
             "libccid"
             "dmsetup"
             "dbus-x11"
-            "libwxgtk3.2-1t64"
-            "libwxgtk3.0-gtk3-0v5"
           )
           
-          # Download each package and its direct dependencies only
+          # Download packages only (no dependencies to avoid conflicts)
           for package in "${DEPENDENCIES[@]}"; do
             echo "Downloading $package..."
-            
-            # Download the package (skip if not available)
             apt-get download "$package" 2>/dev/null || {
               echo "Warning: Could not download $package (may not be needed on target system)"
-              continue
             }
           done
           
-          # Download common dependencies separately to avoid version conflicts
-          echo "Downloading common dependencies..."
-          for package in "${DEPENDENCIES[@]}"; do
-            apt-cache depends --no-recommends --no-suggests \
-              --no-conflicts --no-breaks --no-replaces --no-enhances \
-              "$package" | grep "Depends:" | awk '{print $2}' | \
-              grep -v "^libc6$" | grep -v "^libgcc" | grep -v "^libstdc" | \
-              xargs -r apt-get download 2>/dev/null || true
-          done
+          # Don't download wxWidgets or GTK - these must already be on the system
+          # VeraCrypt will use system-installed versions
           
           # Remove duplicates (keep latest version only)
           for file in *.deb; do
