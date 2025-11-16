@@ -129,25 +129,69 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
         echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
         chmod +x "$GUI_INSTALLER"
         
-        # Run installer in background to capture output but not block
-        echo -e "${YELLOW}Running installer (this may take a moment)...${NC}"
-        
-        # Set environment for non-interactive installation
-        export LESS="-X"
-        export PAGER="cat"
-        
-        # Run installer with proper error handling
-        # The installer will install to /usr/bin and create desktop entry
-        if "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log; then
-            echo -e "${GREEN}VeraCrypt installer completed successfully${NC}"
-        else
-            INSTALL_EXIT=$?
-            # Installer may exit non-zero even on success, check if files exist
-            if [ -f /usr/bin/veracrypt ] || [ -f /usr/local/bin/veracrypt ]; then
-                echo -e "${GREEN}VeraCrypt installed despite exit code $INSTALL_EXIT${NC}"
+        # Check if dbus-launch is available (needed by installer)
+        if ! command -v dbus-launch &> /dev/null; then
+            echo -e "${YELLOW}Note: dbus-launch not available, using alternative installation method${NC}"
+            
+            # Manual extraction and installation (doesn't require dbus-launch)
+            echo -e "${YELLOW}Extracting VeraCrypt files manually...${NC}"
+            
+            # The GUI installer is a self-extracting archive
+            # We'll run it with --tar to just extract, then install manually
+            EXTRACT_DIR=$(mktemp -d)
+            
+            # Try to extract with --tar option first
+            if "$GUI_INSTALLER" --tar -xf - -C "$EXTRACT_DIR" 2>/dev/null; then
+                echo -e "${GREEN}Files extracted${NC}"
             else
-                echo -e "${YELLOW}Installer exited with code $INSTALL_EXIT${NC}"
-                echo -e "${YELLOW}Installation may have completed - will verify...${NC}"
+                # Fallback: the installer itself contains the files after the script header
+                # Find where the tar.gz starts (after __ARCHIVE__ marker)
+                ARCHIVE_LINE=$(grep -an "^__ARCHIVE__" "$GUI_INSTALLER" | cut -d: -f1)
+                if [ -n "$ARCHIVE_LINE" ]; then
+                    tail -n +$((ARCHIVE_LINE + 1)) "$GUI_INSTALLER" | tar -xzf - -C "$EXTRACT_DIR" 2>/dev/null || \
+                    tail -n +$((ARCHIVE_LINE + 1)) "$GUI_INSTALLER" | tar -xjf - -C "$EXTRACT_DIR" 2>/dev/null
+                fi
+            fi
+            
+            # Install files manually
+            if [ -f "$EXTRACT_DIR/usr/bin/veracrypt" ]; then
+                echo -e "${GREEN}Installing VeraCrypt binary and files...${NC}"
+                cp -r "$EXTRACT_DIR/usr/"* /usr/ 2>/dev/null || true
+                chmod +x /usr/bin/veracrypt 2>/dev/null || true
+                
+                # Create desktop entry if it doesn't exist
+                if [ ! -f /usr/share/applications/veracrypt.desktop ] && [ -f "$EXTRACT_DIR/usr/share/applications/veracrypt.desktop" ]; then
+                    cp "$EXTRACT_DIR/usr/share/applications/veracrypt.desktop" /usr/share/applications/
+                fi
+                
+                echo -e "${GREEN}Manual installation completed${NC}"
+            else
+                echo -e "${RED}Failed to extract VeraCrypt files${NC}"
+                echo -e "${YELLOW}Trying standard installer anyway...${NC}"
+                "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log || true
+            fi
+            
+            rm -rf "$EXTRACT_DIR"
+        else
+            # dbus-launch available, use normal installation
+            echo -e "${YELLOW}Running installer (this may take a moment)...${NC}"
+            
+            # Set environment for non-interactive installation
+            export LESS="-X"
+            export PAGER="cat"
+            
+            # Run installer with proper error handling
+            if "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log; then
+                echo -e "${GREEN}VeraCrypt installer completed successfully${NC}"
+            else
+                INSTALL_EXIT=$?
+                # Installer may exit non-zero even on success, check if files exist
+                if [ -f /usr/bin/veracrypt ] || [ -f /usr/local/bin/veracrypt ]; then
+                    echo -e "${GREEN}VeraCrypt installed despite exit code $INSTALL_EXIT${NC}"
+                else
+                    echo -e "${YELLOW}Installer exited with code $INSTALL_EXIT${NC}"
+                    echo -e "${YELLOW}Installation may have completed - will verify...${NC}"
+                fi
             fi
         fi
     elif [ -n "$CONSOLE_INSTALLER" ]; then
