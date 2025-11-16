@@ -128,14 +128,28 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
     if [ -n "$GUI_INSTALLER" ]; then
         echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
         chmod +x "$GUI_INSTALLER"
-        # Run in truly unattended mode - installs GUI VeraCrypt without any popups
+        
+        # Run installer in background to capture output but not block
+        echo -e "${YELLOW}Running installer (this may take a moment)...${NC}"
+        
+        # Set environment for non-interactive installation
         export LESS="-X"
         export PAGER="cat"
         
-        # Run installer (it may exit with non-zero even on success)
-        "$GUI_INSTALLER" --nox11 2>&1 | grep -v "^$" || true
-        
-        echo -e "${GREEN}VeraCrypt installation completed${NC}"
+        # Run installer with proper error handling
+        # The installer will install to /usr/bin and create desktop entry
+        if "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log; then
+            echo -e "${GREEN}VeraCrypt installer completed successfully${NC}"
+        else
+            INSTALL_EXIT=$?
+            # Installer may exit non-zero even on success, check if files exist
+            if [ -f /usr/bin/veracrypt ] || [ -f /usr/local/bin/veracrypt ]; then
+                echo -e "${GREEN}VeraCrypt installed despite exit code $INSTALL_EXIT${NC}"
+            else
+                echo -e "${YELLOW}Installer exited with code $INSTALL_EXIT${NC}"
+                echo -e "${YELLOW}Installation may have completed - will verify...${NC}"
+            fi
+        fi
     elif [ -n "$CONSOLE_INSTALLER" ]; then
         echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
         chmod +x "$CONSOLE_INSTALLER"
@@ -173,6 +187,14 @@ if [ "$VERACRYPT_FOUND" = true ]; then
     echo -e "${GREEN}✓ VeraCrypt installed successfully!${NC}"
     echo -e "${GREEN}  Location: $VERACRYPT_PATH${NC}"
     echo -e "${GREEN}  Version: $VERACRYPT_VERSION${NC}"
+    
+    # Check for desktop integration
+    if [ -f /usr/share/applications/veracrypt.desktop ]; then
+        echo -e "${GREEN}  ✓ Desktop entry created (app icon in menu)${NC}"
+    else
+        echo -e "${YELLOW}  ! Desktop entry not found (no app icon)${NC}"
+        echo -e "${YELLOW}    You can still run 'veracrypt' from terminal${NC}"
+    fi
 else
     echo -e "${RED}✗ VeraCrypt installation verification failed${NC}"
     echo -e "${YELLOW}Checking installation...${NC}"
@@ -185,6 +207,7 @@ else
     else
         echo -e "${YELLOW}  VeraCrypt may not have installed correctly${NC}"
         echo -e "${YELLOW}  Check the installer output above for errors${NC}"
+        echo -e "${YELLOW}  Installer log saved to: /tmp/veracrypt-install.log${NC}"
     fi
 fi
 
