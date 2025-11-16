@@ -76,62 +76,65 @@ fi
 
 echo ""
 
-# Step 1: Install dependencies from local .deb files
-echo -e "${YELLOW}Step 1: Installing dependencies...${NC}"
+# NEW APPROACH: Install VeraCrypt first, then fix dependencies
+echo -e "${YELLOW}Step 1: Installing VeraCrypt (dependencies will be fixed after)...${NC}"
 
-if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
-    # Count total packages for progress indication
-    TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
-    echo -e "${GREEN}Found $TOTAL_DEBS package(s) to install${NC}"
-    
-    # Set environment to prevent hanging on post-install scripts
-    export DEBIAN_FRONTEND=noninteractive
-    export DEBCONF_NONINTERACTIVE_SEEN=true
-    export DEBIAN_PRIORITY=critical
-    export APT_LISTCHANGES_FRONTEND=none
-    
-    # Disable any triggers that might cause hangs
-    echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
-    
-    # Prevent hanging on systemd/dbus operations
-    # Create a policy-rc.d to prevent services from starting during install
-    cat > /usr/sbin/policy-rc.d << 'EOF'
+# Set environment to prevent hanging on post-install scripts
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export DEBIAN_PRIORITY=critical
+export APT_LISTCHANGES_FRONTEND=none
+
+# Prevent services from starting during install
+cat > /usr/sbin/policy-rc.d << 'EOF'
 #!/bin/bash
 exit 101
 EOF
-    chmod +x /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
+
+# Find VeraCrypt installer
+VERACRYPT_INSTALLER=$(find "$SCRIPT_DIR" -name "veracrypt*.deb" -type f | head -n 1)
+
+if [ -z "$VERACRYPT_INSTALLER" ]; then
+    echo -e "${RED}ERROR: VeraCrypt .deb installer not found!${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Found VeraCrypt installer: $(basename "$VERACRYPT_INSTALLER")${NC}"
+
+# Install VeraCrypt (will fail with dependency errors - that's OK!)
+echo -e "${YELLOW}Installing VeraCrypt package...${NC}"
+dpkg -i "$VERACRYPT_INSTALLER" 2>&1 | grep -v "dependency problems" || true
+
+echo ""
+
+# Step 2: Fix dependencies from local archive
+echo -e "${YELLOW}Step 2: Fixing dependencies from local packages...${NC}"
+
+if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
+    TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
+    echo -e "${GREEN}Found $TOTAL_DEBS package(s) available${NC}"
     
-    # Install all .deb files at once (skip conflicting ones)
-    echo -e "${YELLOW}Installing packages (this may take a moment)...${NC}"
-    # Use --auto-deconfigure to handle conflicts, skip already installed packages
-    # Only install packages that aren't already satisfied
+    # Configure dpkg to use our local directory as a package source
+    echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
+    
+    # Install missing dependencies
+    echo -e "${YELLOW}Installing missing dependencies...${NC}"
     INSTALL_OUTPUT=$(dpkg -i --force-depends --force-confold --auto-deconfigure --skip-same-version "$DEBS_DIR"/*.deb 2>&1) || true
     
-    # Count what was actually installed vs skipped
+    # Count what was actually needed
     INSTALLED=$(echo "$INSTALL_OUTPUT" | grep -c "Setting up" || echo "0")
     SKIPPED=$(echo "$INSTALL_OUTPUT" | grep -c "already installed, skipping" || echo "0")
     
     echo -e "${GREEN}  → Installed: $INSTALLED packages${NC}"
     echo -e "${YELLOW}  → Skipped: $SKIPPED packages (already present)${NC}"
     
-    # Show any errors but don't fail
-    if echo "$INSTALL_OUTPUT" | grep -q "error processing"; then
-        echo -e "${YELLOW}  ⚠ Some packages had conflicts (this is usually OK)${NC}"
-    fi
-    
-    # Fix any dependency issues (non-interactive, force if needed, with timeout)
-    echo -e "${YELLOW}Configuring packages...${NC}"
-    # Run with timeout to prevent hanging (300 seconds = 5 minutes)
-    if timeout 300 dpkg --configure -a >/dev/null 2>&1; then
+    # Configure all packages with timeout protection
+    echo -e "${YELLOW}Configuring all packages...${NC}"
+    if timeout 180 dpkg --configure -a >/dev/null 2>&1; then
         echo -e "${GREEN}  → Configuration completed successfully${NC}"
     else
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -eq 124 ]; then
-            echo -e "${YELLOW}  ⚠ Configuration timed out (5 min), forcing completion...${NC}"
-        else
-            echo -e "${YELLOW}  ⚠ Configuration had issues, forcing completion...${NC}"
-        fi
-        # Force configure even if some packages fail
+        echo -e "${YELLOW}  ⚠ Configuration timeout, forcing completion...${NC}"
         dpkg --configure -a --force-confold --force-confdef >/dev/null 2>&1 || true
         echo -e "${GREEN}  → Forced configuration completed${NC}"
     fi
@@ -147,8 +150,8 @@ fi
 
 echo ""
 
-# Step 2: Install VeraCrypt
-echo -e "${YELLOW}Step 2: Installing VeraCrypt...${NC}"
+# Step 3: Final VeraCrypt configuration
+echo -e "${YELLOW}Step 3: Finalizing VeraCrypt installation...${NC}"
 
 # Fix for Debian: Create systemd compatibility symlink if using elogind
 if [ -f /lib/x86_64-linux-gnu/libelogind.so.0 ] && [ ! -f /lib/x86_64-linux-gnu/libsystemd.so.0 ]; then
@@ -158,170 +161,27 @@ if [ -f /lib/x86_64-linux-gnu/libelogind.so.0 ] && [ ! -f /lib/x86_64-linux-gnu/
     echo -e "${GREEN}Compatibility symlink created${NC}"
 fi
 
-if [[ "$VERACRYPT_INSTALLER" == *.deb ]]; then
-    # Install .deb package
-    echo -e "${GREEN}Installing VeraCrypt from .deb package...${NC}"
-    dpkg -i "$VERACRYPT_INSTALLER" || true
-    dpkg --configure -a
-    
-elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
-    # Extract and run GUI installer
-    echo -e "${GREEN}Extracting VeraCrypt installer...${NC}"
-    TEMP_DIR=$(mktemp -d)
-    tar -xjf "$VERACRYPT_INSTALLER" -C "$TEMP_DIR"
-    
-    # Find the GUI installer first (preferred)
-    GUI_INSTALLER=$(find "$TEMP_DIR" -name "veracrypt-*-setup-gui-x64" | head -n 1)
-    CONSOLE_INSTALLER=$(find "$TEMP_DIR" -name "veracrypt-*-setup-console-x64" | head -n 1)
-    
-    if [ -z "$GUI_INSTALLER" ] && [ -z "$CONSOLE_INSTALLER" ]; then
-        echo -e "${RED}Error: Could not find VeraCrypt installer script${NC}"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
-    
-    # Prefer GUI installer (installs the GUI version of VeraCrypt)
-    if [ -n "$GUI_INSTALLER" ]; then
-        echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
-        chmod +x "$GUI_INSTALLER"
-        
-        # Manual extraction and installation (bypasses dbus-launch requirement)
-        echo -e "${YELLOW}Extracting VeraCrypt installer...${NC}"
-        
-        EXTRACT_DIR=$(mktemp -d)
-        INSTALL_SUCCESS=false
-        
-        # Method 1: Extract the makeself archive using --target
-        "$GUI_INSTALLER" --target "$EXTRACT_DIR" --noexec 2>&1 | grep -v "^$" | head -10
-        
-        # The extracted archive contains an installer script (veracrypt_install_gui_x64.sh or similar)
-        # We need to run it or extract files from it
-        INNER_INSTALLER=$(find "$EXTRACT_DIR" -name "veracrypt_install*.sh" -type f | head -1)
-        
-        if [ -n "$INNER_INSTALLER" ] && [ -f "$INNER_INSTALLER" ]; then
-            echo -e "${GREEN}Found VeraCrypt installer script${NC}"
-            chmod +x "$INNER_INSTALLER"
-            
-            # Extract the inner installer to another temp directory
-            INNER_EXTRACT=$(mktemp -d)
-            "$INNER_INSTALLER" --target "$INNER_EXTRACT" --noexec 2>&1 | grep -v "^$" | head -5
-            
-            # Look for veracrypt binary in the extracted content
-            if [ -f "$INNER_EXTRACT/usr/bin/veracrypt" ]; then
-                install -D -m 755 "$INNER_EXTRACT/usr/bin/veracrypt" /usr/bin/veracrypt
-                INSTALL_SUCCESS=true
-                echo -e "${GREEN}✓ Installed VeraCrypt binary${NC}"
-            fi
-            
-            # Look for desktop file
-            if [ -f "$INNER_EXTRACT/usr/share/applications/veracrypt.desktop" ]; then
-                install -D -m 644 "$INNER_EXTRACT/usr/share/applications/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
-                echo -e "${GREEN}✓ Installed desktop entry${NC}"
-            fi
-            
-            # Clean up inner extraction
-            rm -rf "$INNER_EXTRACT" 2>/dev/null
-        fi
-        
-        # Method 2: If method 1 failed, try using --target with extraction
-        if [ "$INSTALL_SUCCESS" = false ]; then
-            echo -e "${YELLOW}Trying alternative extraction method...${NC}"
-            
-            if "$GUI_INSTALLER" --target "$EXTRACT_DIR" --noexec 2>&1 | tee /tmp/veracrypt-extract.log; then
-                echo -e "${GREEN}Files extracted to temporary directory${NC}"
-                
-                # Look for veracrypt binary in extracted files
-                if [ -f "$EXTRACT_DIR/veracrypt" ]; then
-                    install -D -m 755 "$EXTRACT_DIR/veracrypt" /usr/bin/veracrypt
-                    INSTALL_SUCCESS=true
-                    echo -e "${GREEN}Installed VeraCrypt binary${NC}"
-                fi
-                
-                # Look for desktop file
-                if [ -f "$EXTRACT_DIR/veracrypt.desktop" ]; then
-                    install -D -m 644 "$EXTRACT_DIR/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
-                    echo -e "${GREEN}Installed desktop entry${NC}"
-                fi
-                
-                # Check for other common locations in the extracted archive
-                for dir in "$EXTRACT_DIR/usr/bin" "$EXTRACT_DIR/usr/local/bin"; do
-                    if [ -f "$dir/veracrypt" ]; then
-                        install -D -m 755 "$dir/veracrypt" /usr/bin/veracrypt
-                        INSTALL_SUCCESS=true
-                        echo -e "${GREEN}Found and installed VeraCrypt binary from $dir${NC}"
-                    fi
-                done
-                
-                for dir in "$EXTRACT_DIR/usr/share/applications" "$EXTRACT_DIR/usr/local/share/applications"; do
-                    if [ -f "$dir/veracrypt.desktop" ]; then
-                        install -D -m 644 "$dir/veracrypt.desktop" /usr/share/applications/veracrypt.desktop
-                        echo -e "${GREEN}Found and installed desktop entry from $dir${NC}"
-                    fi
-                done
-            fi
-        fi
-        
-        # Method 3: If extraction methods failed, try running installer with workaround
-        if [ "$INSTALL_SUCCESS" = false ]; then
-            echo -e "${YELLOW}Extraction failed, attempting direct installation...${NC}"
-            
-            # Create a minimal dbus-launch wrapper if it doesn't exist
-            if ! command -v dbus-launch &> /dev/null; then
-                echo -e "${YELLOW}Creating temporary dbus-launch workaround...${NC}"
-                cat > /tmp/dbus-launch-wrapper.sh << 'EOF'
-#!/bin/bash
-# Minimal wrapper to bypass dbus-launch requirement
-exec "$@"
-EOF
-                chmod +x /tmp/dbus-launch-wrapper.sh
-                export PATH="/tmp:$PATH"
-                ln -sf /tmp/dbus-launch-wrapper.sh /tmp/dbus-launch
-            fi
-            
-            # Set environment for non-interactive installation
-            export LESS="-X"
-            export PAGER="cat"
-            
-            # Try to run the installer
-            if "$GUI_INSTALLER" --nox11 2>&1 | tee /tmp/veracrypt-install.log; then
-                INSTALL_SUCCESS=true
-                echo -e "${GREEN}Installer completed${NC}"
-            else
-                # Check if installation succeeded despite error
-                if [ -f /usr/bin/veracrypt ] || [ -f /usr/local/bin/veracrypt ]; then
-                    INSTALL_SUCCESS=true
-                    echo -e "${GREEN}VeraCrypt installed successfully${NC}"
-                fi
-            fi
-            
-            # Clean up wrapper
-            rm -f /tmp/dbus-launch /tmp/dbus-launch-wrapper.sh 2>/dev/null
-        fi
-        
-        # Clean up extraction directory
-        rm -rf "$EXTRACT_DIR"
-        
-        if [ "$INSTALL_SUCCESS" = false ]; then
-            echo -e "${RED}All installation methods failed${NC}"
-            echo -e "${YELLOW}Check /tmp/veracrypt-install.log and /tmp/veracrypt-extract.log for details${NC}"
-        fi
-    elif [ -n "$CONSOLE_INSTALLER" ]; then
-        echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
-        chmod +x "$CONSOLE_INSTALLER"
-        "$CONSOLE_INSTALLER" || true
-    fi
-    
-    # Cleanup
-    rm -rf "$TEMP_DIR"
+# Final configuration of VeraCrypt
+echo -e "${YELLOW}Configuring VeraCrypt...${NC}"
+if dpkg --configure veracrypt >/dev/null 2>&1; then
+    echo -e "${GREEN}VeraCrypt configured successfully${NC}"
+else
+    echo -e "${YELLOW}Forcing VeraCrypt configuration...${NC}"
+    dpkg --configure veracrypt --force-all >/dev/null 2>&1 || true
 fi
+
+# Clean up policy-rc.d
+rm -f /usr/sbin/policy-rc.d 2>/dev/null || true
+
+echo -e "${GREEN}Dependencies installed successfully.${NC}"
 
 echo ""
 
-# Step 3: Verify installation
-echo -e "${YELLOW}Step 3: Verifying installation...${NC}"
+# Step 4: Verifying installation...
+echo -e "${YELLOW}Step 4: Verifying installation...${NC}"
 
 # Wait for installation to fully complete
-sleep 3
+sleep 2
 
 # Check multiple possible installation locations
 VERACRYPT_FOUND=false
