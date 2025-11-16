@@ -87,32 +87,26 @@ elif [[ "$VERACRYPT_INSTALLER" == *.tar.bz2 ]]; then
     TEMP_DIR=$(mktemp -d)
     tar -xjf "$VERACRYPT_INSTALLER" -C "$TEMP_DIR"
     
-    # Find the installer script
-    INSTALLER_SCRIPT=$(find "$TEMP_DIR" -name "veracrypt-*-setup-gui-x64" -o -name "veracrypt-*-setup-console-x64" | head -n 1)
+    # Find the GUI installer first (preferred)
+    GUI_INSTALLER=$(find "$TEMP_DIR" -name "veracrypt-*-setup-gui-x64" | head -n 1)
+    CONSOLE_INSTALLER=$(find "$TEMP_DIR" -name "veracrypt-*-setup-console-x64" | head -n 1)
     
-    if [ -z "$INSTALLER_SCRIPT" ]; then
+    if [ -z "$GUI_INSTALLER" ] && [ -z "$CONSOLE_INSTALLER" ]; then
         echo -e "${RED}Error: Could not find VeraCrypt installer script${NC}"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
     
-    # Make installer executable
-    chmod +x "$INSTALLER_SCRIPT"
-    
-    # Check if GUI is available
-    if [ -n "$DISPLAY" ] && [[ "$INSTALLER_SCRIPT" == *-gui-* ]]; then
-        echo -e "${GREEN}Running GUI installer...${NC}"
-        "$INSTALLER_SCRIPT"
-    else
-        echo -e "${GREEN}Running console installer...${NC}"
-        # Use console installer if available, otherwise try GUI
-        CONSOLE_INSTALLER="${INSTALLER_SCRIPT/-gui-/-console-}"
-        if [ -f "$CONSOLE_INSTALLER" ]; then
-            chmod +x "$CONSOLE_INSTALLER"
-            "$CONSOLE_INSTALLER"
-        else
-            "$INSTALLER_SCRIPT"
-        fi
+    # Prefer GUI installer (installs the GUI version of VeraCrypt)
+    if [ -n "$GUI_INSTALLER" ]; then
+        echo -e "${GREEN}Installing VeraCrypt with GUI support...${NC}"
+        chmod +x "$GUI_INSTALLER"
+        # Run in unattended mode to install GUI version
+        "$GUI_INSTALLER" --nox11
+    elif [ -n "$CONSOLE_INSTALLER" ]; then
+        echo -e "${YELLOW}Note: Installing console version (GUI installer not found)${NC}"
+        chmod +x "$CONSOLE_INSTALLER"
+        "$CONSOLE_INSTALLER"
     fi
     
     # Cleanup

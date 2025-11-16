@@ -11,9 +11,10 @@ The installation process is split into two phases:
 
 ## Prerequisites
 
-- Ubuntu 18.04, 20.04, 22.04, or newer
+- Debian 11+ or Ubuntu 20.04+
 - sudo/root access on the target machine
-- Matching Ubuntu versions between download and target machines (recommended)
+- Matching OS versions between download and target machines (recommended)
+- For GUI version: X11 display environment (GNOME, KDE, XFCE, etc.)
 
 ## Phase 1: Download Dependencies (Internet Required)
 
