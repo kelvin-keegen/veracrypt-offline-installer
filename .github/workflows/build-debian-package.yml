@@ -140,6 +140,17 @@ jobs:
               xargs -r apt-get download 2>/dev/null || true
           done
           
+          # Remove systemd packages (Debian fresh ISO uses elogind)
+          echo ""
+          echo "Removing systemd packages (Debian fresh ISO uses elogind)..."
+          rm -f libsystemd0_*.deb \
+                libsystemd-shared_*.deb \
+                systemd_*.deb \
+                systemd-sysv_*.deb \
+                libpam-systemd_*.deb \
+                dbus-user-session_*.deb 2>/dev/null || true
+          echo "  ✓ Systemd packages removed (using elogind instead)"
+          
           # Remove duplicate packages (keep newest version)
           echo ""
           echo "Removing duplicate packages..."
