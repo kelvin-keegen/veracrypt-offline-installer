@@ -1,10 +1,9 @@
-name: Build VeraCrypt Offline Package
+name: Build VeraCrypt Ubuntu 24.04 Package
 
-# Configuration for matching your offline system
+# Configuration for Ubuntu 24.04 offline system
 env:
-  TARGET_UBUNTU_VERSION: "24.04"  # Change this to match your offline PC
-  VERACRYPT_VERSION: "1.26.24"    # Latest VeraCrypt version
-  INCLUDE_WXWIDGETS: "true"       # Set to "false" if you don't need GUI
+  TARGET_VERSION: "24.04"
+  VERACRYPT_VERSION: "1.26.24"
 
 on:
   push:
@@ -17,27 +16,11 @@ on:
         description: 'VeraCrypt version (overrides env)'
         required: false
         default: ''
-      target_ubuntu_version:
-        description: 'Target Ubuntu version (e.g., 24.04, 22.04)'
-        required: false
-        default: ''
 
 jobs:
-  build-offline-package:
-    runs-on: ubuntu-24.04  # Use Ubuntu runner for both builds
-    strategy:
-      matrix:
-        include:
-          - os_name: Ubuntu
-            os_version: "24.04"
-            veracrypt_package: "veracrypt-1.26.24-Ubuntu-24.04-amd64.deb"
-            build_name: "ubuntu-24.04"
-          - os_name: Debian
-            os_version: "12"
-            veracrypt_package: "veracrypt-1.26.24-Debian-12-amd64.deb"
-            build_name: "debian-12"
-    
-    name: Build for ${{ matrix.os_name }} ${{ matrix.os_version }}
+  build-ubuntu-package:
+    runs-on: ubuntu-24.04
+    name: Build for Ubuntu 24.04
     
     steps:
       - name: Checkout repository
@@ -53,9 +36,7 @@ jobs:
           fi
           
           echo "veracrypt_version=$VERACRYPT_VER" >> $GITHUB_OUTPUT
-          echo "os_name=${{ matrix.os_name }}" >> $GITHUB_OUTPUT
-          echo "os_version=${{ matrix.os_version }}" >> $GITHUB_OUTPUT
-          echo "Building for ${{ matrix.os_name }} ${{ matrix.os_version }} with VeraCrypt $VERACRYPT_VER"
+          echo "Building Ubuntu 24.04 package with VeraCrypt $VERACRYPT_VER"
 
       - name: Set up build environment
         run: |
@@ -71,12 +52,11 @@ jobs:
       - name: Download VeraCrypt installer
         run: |
           VERACRYPT_VERSION="${{ steps.config.outputs.veracrypt_version }}"
-          OS_NAME="${{ matrix.os_name }}"
-          VERACRYPT_PACKAGE="${{ matrix.veracrypt_package }}"
+          VERACRYPT_PACKAGE="veracrypt-${VERACRYPT_VERSION}-Ubuntu-24.04-amd64.deb"
           
-          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for ${OS_NAME}"
+          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for Ubuntu 24.04"
           
-          # Download the specific .deb package for the target OS
+          # Download Ubuntu 24.04 .deb package
           VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/${VERACRYPT_PACKAGE}"
           
           wget -O "build/veracrypt-offline-installer/veracrypt/${VERACRYPT_PACKAGE}" \
@@ -180,8 +160,6 @@ jobs:
 
       - name: Create installation info file
         run: |
-          OS_NAME="${{ matrix.os_name }}"
-          OS_VER="${{ matrix.os_version }}"
           cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
           ╔══════════════════════════════════════════════════════════════════╗
           ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
@@ -190,8 +168,8 @@ jobs:
           Build Information:
           ------------------
           Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          Built for: $OS_NAME $OS_VER
-          VeraCrypt Version: ${{ github.event.inputs.veracrypt_version || '1.26.7' }}
+          Built for: Ubuntu 24.04
+          VeraCrypt Version: ${{ steps.config.outputs.veracrypt_version }}
           Git Commit: ${{ github.sha }}
           Git Branch: ${{ github.ref_name }}
           
@@ -231,11 +209,10 @@ jobs:
         run: |
           cd build
           
-          BUILD_NAME="${{ matrix.build_name }}"
           VERACRYPT_VER="${{ steps.config.outputs.veracrypt_version }}"
           
           # Package name indicates it's for FRESH ISO install (no internet/apt update needed)
-          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-${BUILD_NAME}-FRESH-ISO-$(date +%Y%m%d).zip"
+          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-ubuntu-24.04-FRESH-ISO-$(date +%Y%m%d).zip"
           
           zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
           
@@ -270,7 +247,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: veracrypt-offline-installer-${{ matrix.build_name }}
+          name: veracrypt-offline-installer-ubuntu-24.04
           path: artifacts/*.zip
           retention-days: 7
 

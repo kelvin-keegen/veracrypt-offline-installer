@@ -1,0 +1,313 @@
+name: Build VeraCrypt Debian 12 Package
+
+# Configuration for Debian 12 offline system
+env:
+  TARGET_DEBIAN_VERSION: "12"    # Debian version
+  VERACRYPT_VERSION: "1.26.24"   # Latest VeraCrypt version
+  INCLUDE_WXWIDGETS: "true"      # Set to "false" if you don't need GUI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      veracrypt_version:
+        description: 'VeraCrypt version (overrides env)'
+        required: false
+        default: ''
+
+jobs:
+  build-debian-package:
+    runs-on: ubuntu-latest
+    
+    name: Build for Debian 12
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set configuration
+        id: config
+        run: |
+          # Use workflow input if provided, otherwise use env
+          VERACRYPT_VER="${{ github.event.inputs.veracrypt_version }}"
+          if [ -z "$VERACRYPT_VER" ]; then
+            VERACRYPT_VER="${{ env.VERACRYPT_VERSION }}"
+          fi
+          
+          echo "veracrypt_version=$VERACRYPT_VER" >> $GITHUB_OUTPUT
+          echo "os_name=Debian" >> $GITHUB_OUTPUT
+          echo "os_version=12" >> $GITHUB_OUTPUT
+          echo "Building for Debian 12 with VeraCrypt $VERACRYPT_VER"
+
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget curl zip lsb-release
+
+      - name: Create package directories
+        run: |
+          mkdir -p build/veracrypt-offline-installer/debs
+          mkdir -p build/veracrypt-offline-installer/veracrypt
+          mkdir -p artifacts
+
+      - name: Download VeraCrypt installer
+        run: |
+          VERACRYPT_VERSION="${{ steps.config.outputs.veracrypt_version }}"
+          VERACRYPT_PACKAGE="veracrypt-${VERACRYPT_VERSION}-Debian-12-amd64.deb"
+          
+          echo "Downloading VeraCrypt ${VERACRYPT_VERSION} for Debian 12"
+          
+          # Download the specific .deb package for Debian 12
+          VERACRYPT_URL="https://launchpad.net/veracrypt/trunk/${VERACRYPT_VERSION}/+download/${VERACRYPT_PACKAGE}"
+          
+          wget -O "build/veracrypt-offline-installer/veracrypt/${VERACRYPT_PACKAGE}" \
+            "$VERACRYPT_URL" || {
+            echo "Error: Could not download VeraCrypt .deb installer"
+            exit 1
+          }
+          
+          echo "✓ Downloaded: ${VERACRYPT_PACKAGE}"
+
+      - name: Download dependencies using Debian 12 container
+        run: |
+          # Create script to run inside Debian container
+          cat > download-deps.sh << 'SCRIPT_EOF'
+          #!/bin/bash
+          set -e
+          
+          cd /output
+          
+          # Update package lists (this runs inside the container only)
+          apt-get update
+          
+          # COMPLETE dependencies for FRESH ISO install
+          # These are ALL packages needed when starting from fresh Debian 12 ISO
+          DEPENDENCIES=(
+            # VeraCrypt specific
+            "libfuse2"
+            "dmsetup"
+            "pcscd"
+            "libccid"
+            "libwxgtk3.2-1"
+            "libwxbase3.2-1"
+            "libayatana-appindicator3-1"
+            "libayatana-indicator3-7"
+            "libayatana-ido3-0.4-0"
+            "libdbusmenu-glib4"
+            "libdbusmenu-gtk3-4"
+            "libcurl4"
+            "libpcre2-32-0"
+            "libnotify4"
+            "libusb-1.0-0"
+            "libpcsclite1"
+            "libpolkit-gobject-1-0"
+            # GTK and system libraries (required on fresh ISO)
+            "libgtk-3-0"
+            "libglib2.0-0"
+            "libcairo2"
+            "libpango-1.0-0"
+            "libpangocairo-1.0-0"
+            "libpangoft2-1.0-0"
+            "libgdk-pixbuf-2.0-0"
+            "libfontconfig1"
+            "libx11-6"
+            "libsm6"
+            "libxkbcommon0"
+            # Extraction utilities (required for .tar.bz2)
+            "bzip2"
+          )
+          
+          echo "Downloading ${#DEPENDENCIES[@]} core packages and their dependencies..."
+          
+          # Download packages
+          for package in "${DEPENDENCIES[@]}"; do
+            echo "  Downloading $package..."
+            apt-get download "$package" 2>/dev/null || {
+              echo "    Warning: Could not download $package"
+            }
+          done
+          
+          # Download ALL transitive dependencies (recursive)
+          echo ""
+          echo "Downloading transitive dependencies..."
+          for package in "${DEPENDENCIES[@]}"; do
+            apt-cache depends --recurse --no-recommends --no-suggests \
+              --no-conflicts --no-breaks --no-replaces --no-enhances \
+              "$package" 2>/dev/null | grep "^\w" | sort -u | \
+              xargs -r apt-get download 2>/dev/null || true
+          done
+          
+          # Remove duplicate packages (keep newest version)
+          echo ""
+          echo "Removing duplicate packages..."
+          for file in *.deb; do
+            [ -f "$file" ] || continue
+            basename="${file%%_*}"
+            count=$(ls -1 "${basename}"_*.deb 2>/dev/null | wc -l)
+            if [ "$count" -gt 1 ]; then
+              ls -1t "${basename}"_*.deb | tail -n +2 | xargs rm -f 2>/dev/null || true
+            fi
+          done
+          
+          DEB_COUNT=$(ls -1 *.deb 2>/dev/null | wc -l)
+          echo ""
+          echo "✓ Downloaded ${DEB_COUNT} package files"
+          echo "Package is ready for FRESH ISO install (no internet/apt update required)"
+          SCRIPT_EOF
+          
+          chmod +x download-deps.sh
+          
+          # Run the script inside a Debian 12 container to download Debian-specific packages
+          docker run --rm \
+            -v "$(pwd)/build/veracrypt-offline-installer/debs:/output" \
+            -v "$(pwd)/download-deps.sh:/download-deps.sh:ro" \
+            debian:12 \
+            /download-deps.sh
+          
+          # Clean up
+          rm download-deps.sh
+
+      - name: Copy installation scripts
+        run: |
+          cp install-veracrypt-offline.sh build/veracrypt-offline-installer/
+          cp menu.sh build/veracrypt-offline-installer/
+          cp verify-package.sh build/veracrypt-offline-installer/
+          cp USAGE.md build/veracrypt-offline-installer/
+          
+          # Make scripts executable
+          chmod +x build/veracrypt-offline-installer/*.sh
+
+      - name: Create installation info file
+        run: |
+          cat > build/veracrypt-offline-installer/BUILD-INFO.txt << EOF
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║           VERACRYPT OFFLINE INSTALLATION PACKAGE                  ║
+          ╚══════════════════════════════════════════════════════════════════╝
+          
+          Build Information:
+          ------------------
+          Built on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Built for: Debian 12
+          VeraCrypt Version: ${{ steps.config.outputs.veracrypt_version }}
+          Git Commit: ${{ github.sha }}
+          Git Branch: ${{ github.ref_name }}
+          
+          Package Contents:
+          -----------------
+          ✓ VeraCrypt generic installer (works on Debian/Ubuntu)
+          ✓ All required dependencies (.deb packages)
+          ✓ Installation scripts
+          ✓ Documentation
+          
+          Installation Instructions:
+          --------------------------
+          1. Extract this ZIP file on your Debian/Ubuntu machine
+          2. Open a terminal in the extracted folder
+          3. Run: sudo ./install-veracrypt-offline.sh
+          4. Launch VeraCrypt: veracrypt
+          
+          Compatible with: Debian 11+, Ubuntu 20.04+
+          
+          For installation instructions, see USAGE.md
+          For interactive menu, run: ./menu.sh
+          
+          ╚══════════════════════════════════════════════════════════════════╝
+          EOF
+
+      - name: Generate checksums
+        run: |
+          cd build/veracrypt-offline-installer
+          
+          # Generate SHA256 checksums for all files
+          find . -type f \( -name "*.deb" -o -name "*.tar.bz2" -o -name "*.sh" \) \
+            -exec sha256sum {} \; > SHA256SUMS.txt
+          
+          echo "Checksums generated"
+
+      - name: Create distribution package
+        run: |
+          cd build
+          
+          VERACRYPT_VER="${{ steps.config.outputs.veracrypt_version }}"
+          
+          # Package name indicates it's for FRESH ISO install (no internet/apt update needed)
+          PACKAGE_NAME="veracrypt-${VERACRYPT_VER}-offline-debian-12-FRESH-ISO-$(date +%Y%m%d).zip"
+          
+          zip -r "$PACKAGE_NAME" veracrypt-offline-installer/
+          
+          # Move to artifacts directory
+          mv "$PACKAGE_NAME" ../artifacts/
+          
+          echo "Created package: $PACKAGE_NAME"
+          echo "Package size: $(du -h ../artifacts/$PACKAGE_NAME | cut -f1)"
+          
+          # Count packages
+          DEB_COUNT=$(find veracrypt-offline-installer/debs -name "*.deb" | wc -l)
+          echo "Total dependency packages: $DEB_COUNT"
+          echo ""
+          echo "✓ Package ready for fresh ISO install (no internet required)"
+          echo "Target system: Ubuntu $TARGET_VER"
+          echo "VeraCrypt version: $VERACRYPT_VER"
+
+      - name: Generate package summary
+        run: |
+          cd artifacts
+          
+          for zipfile in *.zip; do
+            echo "Package: $zipfile"
+            echo "Size: $(du -h $zipfile | cut -f1)"
+            echo "Files inside:"
+            unzip -l "$zipfile" | head -20 || true
+            echo ""
+          done > package-summary.txt
+          
+          cat package-summary.txt || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: veracrypt-offline-installer-debian-12
+          path: artifacts/*.zip
+          retention-days: 7
+
+      - name: Create release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: VeraCrypt Offline Installer - ${{ github.ref_name }}
+          body: |
+            # VeraCrypt Offline Installation Package (Fresh ISO Compatible)
+            
+            **Built for FRESH Ubuntu 24.04 ISO** - No internet or apt update required!
+            
+            ## Tested Environment
+            - ✅ Fresh Ubuntu 24.04 ISO install (no internet access)
+            - ✅ No apt update needed
+            - ✅ ~230 dependency packages included
+            - ✅ Complete GTK and system libraries
+            
+            ## Installation
+            1. Download the ZIP file to USB drive
+            2. Transfer to your offline Ubuntu 24.04 PC
+            3. Extract: `unzip veracrypt-*-FRESH-ISO-*.zip`
+            4. Install: `cd veracrypt-offline-installer && sudo ./install-veracrypt-offline.sh`
+            5. Launch: `veracrypt` (or find in applications menu)
+            
+            ## Contents
+            - VeraCrypt ${{ github.event.inputs.veracrypt_version || '1.26.24' }}
+            - ~230 dependency packages (complete set for fresh ISO)
+            - Installation scripts with verification
+            - Documentation
+            
+            ## Package Size
+            Approximately 128 MB (all dependencies included)
+            
+            See USAGE.md and TEST-FRESH-ISO.md in the package for detailed information.
+          draft: false
+          prerelease: false
