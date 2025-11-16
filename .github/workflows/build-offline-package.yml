@@ -31,9 +31,11 @@ jobs:
             OS_NAME=$(lsb_release -is)
             OS_VER=$(lsb_release -rs)
           fi
+          # Sanitize version string (remove slashes and special chars)
+          OS_VER_CLEAN=$(echo "$OS_VER" | sed 's/[\/]/-/g' | sed 's/[^a-zA-Z0-9.-]//g')
           echo "os_name=$OS_NAME" >> $GITHUB_OUTPUT
-          echo "os_version=$OS_VER" >> $GITHUB_OUTPUT
-          echo "Detected: $OS_NAME $OS_VER"
+          echo "os_version=$OS_VER_CLEAN" >> $GITHUB_OUTPUT
+          echo "Detected: $OS_NAME $OS_VER (sanitized to: $OS_VER_CLEAN)"
 
       - name: Set up build environment
         run: |
