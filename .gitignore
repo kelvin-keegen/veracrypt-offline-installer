@@ -4,10 +4,20 @@ veracrypt/
 *.tar.bz2
 .wget-hsts
 
-# Build artifacts
+# Build artifacts (use GitHub Actions workflow instead)
 build/
 artifacts/
 *.zip
+debian12-package/
+ubuntu-package/
+
+# Downloaded artifacts from GitHub
+github-artifacts/
+
+# Test directories
+test-package/
+test-final/
+test-install/
 
 # Downloaded files
 *.bz2
@@ -19,6 +29,3 @@ sample_volume
 # Log files
 *.log
 install.log
-test-package/
-artifacts/
-build/
