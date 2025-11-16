@@ -11,3 +11,11 @@ artifacts/
 
 # Downloaded files
 *.bz2
+
+# Large test files
+sample_volume
+*.volume
+
+# Log files
+*.log
+install.log
