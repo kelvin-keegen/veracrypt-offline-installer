@@ -148,8 +148,13 @@ jobs:
                 systemd_*.deb \
                 systemd-sysv_*.deb \
                 libpam-systemd_*.deb \
-                dbus-user-session_*.deb 2>/dev/null || true
-          echo "  ✓ Systemd packages removed (using elogind instead)"
+                dbus-user-session_*.deb \
+                dbus-daemon_*.deb \
+                dbus-bin_*.deb \
+                dbus-broker_*.deb \
+                dbus-x11_*.deb \
+                dbus_*.deb 2>/dev/null || true
+          echo "  ✓ Systemd and dbus packages removed (using elogind instead)"
           
           # Remove duplicate packages (keep newest version)
           echo ""
