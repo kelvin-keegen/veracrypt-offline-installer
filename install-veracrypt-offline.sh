@@ -153,8 +153,11 @@ echo ""
 # Step 3: Verify installation
 echo -e "${YELLOW}Step 3: Verifying installation...${NC}"
 
+# Wait a moment for installation to fully complete
+sleep 2
+
 if command -v veracrypt &> /dev/null; then
-    VERACRYPT_VERSION=$(veracrypt --version 2>&1 | head -n 1 || echo "VeraCrypt installed")
+    VERACRYPT_VERSION=$(veracrypt --version 2>&1 | head -n 1 2>/dev/null || echo "installed")
     echo -e "${GREEN}✓ VeraCrypt installed successfully!${NC}"
     echo -e "${GREEN}  Version: $VERACRYPT_VERSION${NC}"
 else

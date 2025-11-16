@@ -77,7 +77,6 @@ jobs:
             "pcscd"
             "libccid"
             "dmsetup"
-            "dbus-x11"
           )
           
           # Download packages only (no dependencies to avoid conflicts)
@@ -88,7 +87,7 @@ jobs:
             }
           done
           
-          # Don't download wxWidgets or GTK - these must already be on the system
+          # Don't download wxWidgets, GTK, or dbus - these must already be on the system
           # VeraCrypt will use system-installed versions
           
           # Remove duplicates (keep latest version only)
