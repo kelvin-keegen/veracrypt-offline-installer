@@ -115,33 +115,32 @@ if [ "$(ls -A $DEBS_DIR/*.deb 2>/dev/null)" ]; then
     TOTAL_DEBS=$(ls -1 "$DEBS_DIR"/*.deb 2>/dev/null | wc -l)
     echo -e "${GREEN}Found $TOTAL_DEBS package(s) available${NC}"
     
-    # Configure dpkg to use our local directory as a package source
-    echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
+    # Get list of VeraCrypt's direct dependencies
+    VERACRYPT_DEPS=$(dpkg-deb -f "$VERACRYPT_INSTALLER" Depends | tr ',' '\n' | sed 's/(.*)//g' | sed 's/|.*//g' | awk '{print $1}' | grep -v '^$')
     
-    # Install missing dependencies
-    echo -e "${YELLOW}Installing missing dependencies...${NC}"
-    INSTALL_OUTPUT=$(dpkg -i --force-depends --force-confold --auto-deconfigure --skip-same-version "$DEBS_DIR"/*.deb 2>&1) || true
+    echo -e "${YELLOW}Installing VeraCrypt dependencies...${NC}"
     
-    # Count what was actually needed
-    INSTALLED=$(echo "$INSTALL_OUTPUT" | grep -c "Setting up" || echo "0")
-    SKIPPED=$(echo "$INSTALL_OUTPUT" | grep -c "already installed, skipping" || echo "0")
+    # First pass: Install VeraCrypt's direct dependencies
+    for DEP in $VERACRYPT_DEPS; do
+        if ! dpkg -l "$DEP" 2>/dev/null | grep -q "^ii"; then
+            DEP_FILE=$(find "$DEBS_DIR" -name "${DEP}_*.deb" -o -name "${DEP}[:-]*.deb" 2>/dev/null | head -n 1)
+            if [ -n "$DEP_FILE" ]; then
+                echo -e "${GREEN}  → Installing $DEP${NC}"
+                dpkg -i --force-depends "$DEP_FILE" 2>&1 | grep -v "dependency problems" || true
+            fi
+        fi
+    done
     
-    echo -e "${GREEN}  → Installed: $INSTALLED packages${NC}"
-    echo -e "${YELLOW}  → Skipped: $SKIPPED packages (already present)${NC}"
+    # Second pass: Fix any remaining broken dependencies by installing all debs
+    # This catches transitive dependencies
+    echo -e "${YELLOW}Installing transitive dependencies...${NC}"
+    dpkg -i --force-depends --skip-same-version "$DEBS_DIR"/*.deb 2>&1 | \
+        grep -E "Setting up|Unpacking" | head -20 || true
     
-    # Configure all packages with timeout protection
-    echo -e "${YELLOW}Configuring all packages...${NC}"
-    if timeout 180 dpkg --configure -a >/dev/null 2>&1; then
-        echo -e "${GREEN}  → Configuration completed successfully${NC}"
-    else
-        echo -e "${YELLOW}  ⚠ Configuration timeout, forcing completion...${NC}"
-        dpkg --configure -a --force-confold --force-confdef >/dev/null 2>&1 || true
-        echo -e "${GREEN}  → Forced configuration completed${NC}"
-    fi
-    
-    # Clean up
-    rm -f /etc/dpkg/dpkg.cfg.d/02apt-speedup 2>/dev/null || true
-    rm -f /usr/sbin/policy-rc.d 2>/dev/null || true
+    # Configure everything
+    echo -e "${YELLOW}Configuring packages...${NC}"
+    dpkg --configure -a 2>&1 | grep -v "^Processing" || true
+    echo -e "${GREEN}  → All packages configured${NC}"
     
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 else
@@ -170,7 +169,7 @@ else
     dpkg --configure veracrypt --force-all >/dev/null 2>&1 || true
 fi
 
-# Clean up policy-rc.d
+# Clean up
 rm -f /usr/sbin/policy-rc.d 2>/dev/null || true
 
 echo -e "${GREEN}Dependencies installed successfully.${NC}"
